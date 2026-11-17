@@ -1,0 +1,20 @@
+{
+  "driver": "OpenGL ES 3.2 Mesa 25.2.8-0ubuntu0.24.04.2",
+  "renderer": "llvmpipe (LLVM 20.1.2, 256 bits)",
+  "programs_linked": 7,
+  "framebuffers_complete": 4,
+  "renders": [
+    {
+      "shadow_mode": 0,
+      "rgb_sum_range": [
+        103,
+        765
+      ],
+      "mean_channel": 128.3759085648148,
+      "shadowed_geometry_pixels": 8200,
+      "lit_geometry_pixels": 13256,
+      "gl_error": 0
+    }
+  ],
+  "instanced_render": null
+}

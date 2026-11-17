@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Aurora · Phase One Engine Laboratory</title><meta name="description" content="A custom WebGL 2 research engine with deferred PBR, ray-traced shadows, volumetric atmosphere and rigid body physics."><link rel="stylesheet" href="lab.css"></head>
+<body>
+  <header class="topbar"><a class="wordmark" href="./" aria-label="Aurora engine home"><span class="mark">A</span>AURORA<span class="wordmark-sub">ENGINE LABORATORY</span></a><div class="top-status"><span class="live-dot"></span><span id="status">PHASE 01 / CORE SYSTEMS</span><span class="version">v0.1.0</span></div></header>
+  <main class="workspace">
+    <section class="scene" aria-label="Interactive 3D engine test scene">
+      <canvas id="viewport" tabindex="0" aria-label="3D scene. Drag to orbit, scroll to zoom. WASD drive the test vehicle, space for handbrake, F to launch a sphere."></canvas>
+      <div class="scene-title"><span class="eyebrow">REAL-TIME SYSTEMS TESTBED</span><h1>Light. Motion.<br><span>Material.</span></h1><p>A rendering & physics foundation,<br>built from first principles.</p></div>
+      <div class="time-chip"><span class="sun-icon">◒</span><div><span class="small-label">SOLAR TIME</span><strong id="clock">16:24</strong></div></div>
+      <div class="scene-badges"><span>WEBGL 2</span><span>HDR / PBR</span><span>120 Hz PHYSICS</span></div>
+      <div class="scene-bottom"><div class="vehicle-readout"><span class="small-label">RAYCAST VEHICLE</span><strong id="speed">0 km/h</strong><span id="rpm">900 rpm · 1</span></div><button id="reset-view" class="quiet-button">↺ Reset view</button></div>
+      <div class="help-strip"><span><kbd>DRAG</kbd> orbit</span><span><kbd>SCROLL</kbd> zoom</span><span><kbd>W A S D</kbd> drive</span><span><kbd>SPACE</kbd> handbrake</span><span><kbd>B</kbd> brake</span></div>
+    </section>
+    <aside class="controls" aria-label="Engine controls">
+      <div class="panel-heading"><span class="eyebrow">LIVE CONTROLS</span><h2>Engine inspector</h2><span class="panel-note">Every control changes the running simulation.</span></div>
+      <section class="control-group"><div class="group-title"><span>01</span><h3>Atmosphere</h3></div>
+        <label class="range-label" for="hour">Sun position <output id="hour-value">16:24</output></label><input id="hour" type="range" min="0" max="23.99" step=".05" value="16.4"><div class="range-hints"><span>Midnight</span><span>Noon</span><span>Midnight</span></div>
+        <label class="toggle"><span>Advance day / night</span><input id="cycle" type="checkbox"><span class="switch"></span></label>
+        <label class="range-label" for="rain">Rain intensity <output id="rain-value">0%</output></label><input id="rain" type="range" min="0" max="1" step=".05" value="0"><div class="mini-metric"><span>Surface saturation</span><strong id="wetness">0%</strong></div>
+      </section>
+      <section class="control-group"><div class="group-title"><span>02</span><h3>Render pipeline</h3></div>
+        <label class="select-label" for="shadows">Sun shadows</label><select id="shadows"><option value="0">Raster map · 3 × 3 PCF</option><option value="1">Ray traced · triangle BVH</option></select>
+        <label class="toggle"><span>Screen-space indirect light</span><input id="gi" type="checkbox" checked><span class="switch"></span></label>
+        <label class="toggle"><span>Volumetric fog</span><input id="fog" type="checkbox" checked><span class="switch"></span></label>
+        <label class="toggle"><span>Wet surface reflections</span><input id="ssr" type="checkbox" checked><span class="switch"></span></label>
+        <label class="toggle"><span>GPU occlusion queries</span><input id="occlusion" type="checkbox" checked><span class="switch"></span></label>
+        <label class="range-label" for="exposure">Exposure</label><input id="exposure" type="range" min=".3" max="2.5" step=".05" value="1.1">
+        <label class="range-label" for="resolution">Render scale <output id="resolution-label">80%</output></label><input id="resolution" type="range" min=".35" max="1" step=".05" value=".8">
+        <label class="select-label" for="debug">Buffer inspection</label><select id="debug"><option value="0">Final image</option><option value="1">Linear albedo</option><option value="2">World normals</option><option value="3">Sun visibility</option><option value="4">Wetness field</option><option value="5">Indirect illumination</option></select>
+      </section>
+      <section class="control-group"><div class="group-title"><span>03</span><h3>Physics bench</h3></div><div class="action-grid"><button id="ragdoll">Drop ragdoll <span>↘</span></button><button id="launch">Launch sphere <span>↗</span></button></div><button id="reset-car" class="full-button">Reset vehicle <kbd>R</kbd></button><button id="pause" class="full-button" aria-pressed="false">Pause simulation</button><p class="physics-note">Sequential impulses · articulated joints · XPBD surface · tire friction circle</p></section>
+      <p id="notice" role="status" class="notice">Experimental foundation. Phase 1 only.</p>
+    </aside>
+  </main>
+  <footer class="telemetry" aria-label="Performance telemetry"><div class="fps-stat"><strong id="fps">—</strong><span>FPS</span></div><div><span>CPU / FRAME</span><strong id="cpu">—</strong></div><div><span>GPU / FRAME</span><strong id="gpu">—</strong></div><div><span>TRIANGLES</span><strong id="triangles">—</strong></div><div><span>RIGID BODIES</span><strong id="bodies">—</strong></div><div><span>CONTACTS</span><strong id="contact-count">—</strong></div><div><span>CULLED / TOTAL</span><strong id="culling">—</strong></div><div><span>STREAMED TEXTURES</span><strong id="memory">—</strong></div></footer>
+  <div id="error" class="error-overlay" role="alert" hidden><div><span class="eyebrow">ENGINE DIAGNOSTIC</span><h2>Renderer could not continue</h2><pre id="error-message"></pre><p>Use a browser with WebGL 2, floating-point render targets, and hardware acceleration enabled.</p><button id="dismiss-error">Dismiss</button></div></div>
+  <script type="module" src="src/main.js"></script>
+</body></html>
