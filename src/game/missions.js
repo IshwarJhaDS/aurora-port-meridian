@@ -8,13 +8,13 @@ export const REPAIR_LAMPS = Object.freeze([
 ]);
 
 export const MISSION_DEFINITIONS = Object.freeze([
-  { id: 'arrival', title: 'A place to begin', category: 'STORY', description: 'Meet the people who keep Old Meridian moving. A small favor is a good first step.', reward: 120, reputation: 4, giver: 'mira', steps: [talk('mira', 'Introduce yourself to Mira in Founders Square.', 'plaza'), { kind: 'reach', target: 'cafe', place: 'cafe', text: 'Walk to Harbor Coffee.' }, talk('leo', 'Say hello to Leo at the café.', 'cafe'), talk('mira', 'Return to Mira with news from the neighborhood.', 'plaza')] },
-  { id: 'courier', title: 'The neighborhood route', category: 'WORK', description: 'Collect a parcel at Eastside Dispatch and deliver it safely. Routes change between shifts.', reward: 95, reputation: 2, giver: 'tess', repeatable: true },
-  { id: 'cafe', title: 'The afternoon rush', category: 'WORK', description: 'Work a three-order café shift: brew, pack, and serve each order before the shift ends.', reward: 85, reputation: 2, giver: 'leo', repeatable: true },
-  { id: 'voices', title: 'Neighborhood voices', category: 'STORY', description: 'Listen to Rosa, Eli, and Juno. What happened to the harbor lights?', reward: 150, reputation: 4, giver: 'mira', steps: [{ kind: 'voices', targets: ['rosa', 'eli', 'juno'], place: 'market', text: 'Speak with Rosa, Eli, and Juno about the harbor.' }, talk('mira', 'Tell Mira what you learned.', 'plaza')] },
-  { id: 'repair', title: 'Keep the lights on', category: 'WORK', description: 'Collect Sanjay’s tools, repair three damaged streetlights, and restore the evening promenade.', reward: 180, reputation: 5, giver: 'sanjay' },
-  { id: 'shipment', title: 'The missing manifest', category: 'STORY', description: 'Help Tess trace a misrouted clinic shipment through Warehouse 08.', reward: 250, reputation: 6, giver: 'tess', requirement: 'Build 4 reputation to earn Tess’s trust.', steps: [talk('tess', 'Ask Tess about the missing shipment.', 'depot'), place('warehouse', 'Inspect the shipping manifest at Warehouse 08.'), talk('sanjay', 'Ask Sanjay what arrived at the harbor.', 'harbor'), talk('tess', 'Bring the corrected manifest back to Tess.', 'depot')] },
-  { id: 'lookout', title: 'The city from above', category: 'EXPLORATION', description: 'Take a break in Cedar Hills and frame a postcard of the city.', reward: 80, reputation: 1, giver: 'juno', steps: [{ kind: 'reach', target: 'lookout', place: 'lookout', text: 'Reach Cedar Hill Lookout.' }, { kind: 'photo', target: 'lookout', place: 'lookout', text: 'Press V at the lookout to frame a postcard.' }] }
+  { id: 'arrival', title: 'First steps in the valley', category: 'STORY', description: 'Find your feet in Durbar Square, greet Maya didi, follow the footpath to the tea shop and bring Laxman dai’s news home. Then take your Maruti for a gentle first drive.', reward: 120, reputation: 4, giver: 'mira', steps: [talk('mira', 'Meet Maya didi in Durbar Square. Walk up and press E to introduce yourself.', 'plaza'), { kind: 'reach', target: 'cafe', place: 'cafe', text: 'Follow the footpath to Himalayan Chiya Pasal. M opens the map; J shows this story.' }, talk('leo', 'Press E beside Laxman dai at the tea shop and say namaste.', 'cafe'), talk('mira', 'Return to Maya didi in Durbar Square and tell her you met Laxman dai.', 'plaza')] },
+  { id: 'courier', title: 'The neighborhood route', category: 'WORK', description: 'Collect a parcel at Sajha Courier and deliver it safely. Routes change between shifts.', reward: 95, reputation: 2, giver: 'tess', repeatable: true },
+  { id: 'cafe', title: 'The chiya rush', category: 'WORK', description: 'Work a three-order shift at the tea shop: brew milk chiya, pack the momos, and serve each order before the shift ends.', reward: 85, reputation: 2, giver: 'leo', repeatable: true },
+  { id: 'voices', title: 'Voices of the tole', category: 'STORY', description: 'Listen to Rasmila, Bikash and Junu. What happened to the ghat lights?', reward: 150, reputation: 4, giver: 'mira', steps: [{ kind: 'voices', targets: ['rosa', 'eli', 'juno'], place: 'market', text: 'Speak with Rasmila, Bikash and Junu about the ghat.' }, talk('mira', 'Tell Maya didi what you learned.', 'plaza')] },
+  { id: 'repair', title: 'Keep the lights on', category: 'WORK', description: 'Collect Sanjay dai’s tools, repair three damaged streetlights, and light up the evening ghat.', reward: 180, reputation: 5, giver: 'sanjay' },
+  { id: 'shipment', title: 'The missing manifest', category: 'STORY', description: 'Help Tashi trace a misrouted health post shipment through Godam 08.', reward: 250, reputation: 6, giver: 'tess', requirement: 'Build 4 reputation to earn Tashi’s trust.', steps: [talk('tess', 'Ask Tashi about the missing shipment.', 'depot'), place('warehouse', 'Inspect the shipping manifest at Godam 08.'), talk('sanjay', 'Ask Sanjay dai what arrived at the ghat.', 'harbor'), talk('tess', 'Bring the corrected manifest back to Tashi.', 'depot')] },
+  { id: 'lookout', title: 'The valley from above', category: 'EXPLORATION', description: 'Climb to Sarangkot and frame a postcard of the Himalaya.', reward: 80, reputation: 1, giver: 'juno', steps: [{ kind: 'reach', target: 'lookout', place: 'lookout', text: 'Reach Sarangkot Viewpoint.' }, { kind: 'photo', target: 'lookout', place: 'lookout', text: 'Press V at the lookout to frame a postcard.' }] }
 ]);
 
 export class MissionSystem {
@@ -28,9 +28,9 @@ export class MissionSystem {
   steps(id) {
     const def = this.definition(id); if (!def) return [];
     const state = this.progress.missions[id];
-    if (id === 'courier') { const target = ['clinic', 'market', 'harbor'][state?.variant || 0]; return [place('depot', 'Collect your parcel at Eastside Dispatch.'), place(target, `Deliver the parcel to ${POIS.find(p => p.id === target).name}.`)]; }
-    if (id === 'cafe') return Array.from({ length: 9 }, (_, i) => ({ kind: 'work', target: ['brew', 'pack', 'serve'][i % 3], place: 'cafe', text: `Order ${Math.floor(i / 3) + 1} of 3 · ${['brew the coffee', 'pack the order', 'serve the customer'][i % 3]}.` }));
-    if (id === 'repair') return [place('harbor', 'Collect Sanjay’s tool kit at the harbor workshop.'), ...REPAIR_LAMPS.map((lamp, i) => ({ kind: 'repair', target: lamp.id, place: 'harbor', position: new Vec3(lamp.x, terrainHeight(lamp.x, lamp.z), lamp.z), text: `Repair streetlight ${i + 1} of 3. Hold E beside the lamp.` })), talk('sanjay', 'Return the tool kit to Sanjay.', 'harbor')];
+    if (id === 'courier') { const target = ['clinic', 'market', 'harbor'][state?.variant || 0]; return [place('depot', 'Collect your parcel at Sajha Courier.'), place(target, `Deliver the parcel to ${POIS.find(p => p.id === target).name}.`)]; }
+    if (id === 'cafe') return Array.from({ length: 9 }, (_, i) => ({ kind: 'work', target: ['brew', 'pack', 'serve'][i % 3], place: 'cafe', text: `Order ${Math.floor(i / 3) + 1} of 3 · ${['brew the milk chiya', 'pack the momos', 'serve the customer'][i % 3]}.` }));
+    if (id === 'repair') return [place('harbor', 'Collect Sanjay dai’s tool kit at the ghat workshop.'), ...REPAIR_LAMPS.map((lamp, i) => ({ kind: 'repair', target: lamp.id, place: 'harbor', position: new Vec3(lamp.x, terrainHeight(lamp.x, lamp.z), lamp.z), text: `Repair streetlight ${i + 1} of 3. Hold E beside the lamp.` })), talk('sanjay', 'Return the tool kit to Sanjay dai.', 'harbor')];
     return def.steps;
   }
   accept(id) {
@@ -68,7 +68,7 @@ export class MissionSystem {
       if (step.kind === 'place') match = kind === 'interact' && target === step.target || kind === 'talk' && data.place === step.target;
       if (step.kind === 'work') match = kind === 'work' && target === step.target && data.place === 'cafe';
       if (step.kind === 'voices' && kind === 'talk' && step.targets.includes(target)) {
-        if (!state.flags.includes(target)) { state.flags.push(target); this.notify(`Neighborhood voices · ${state.flags.length}/3`); progressed = true; }
+        if (!state.flags.includes(target)) { state.flags.push(target); this.notify(`Voices of the tole · ${state.flags.length}/3`); progressed = true; }
         match = step.targets.every(x => state.flags.includes(x));
       }
       if (!match) continue;
@@ -85,7 +85,7 @@ export class MissionSystem {
     state.status = 'completed';
     const cycle = def.repeatable ? (id === 'courier' ? this.progress.courierCycle++ : this.progress.jobCount++) : 0;
     this.store.reward(`mission:${id}:${cycle}`, def.reward, def.reputation);
-    this.notify(`Completed · ${def.title}   +$${def.reward}   +${def.reputation} reputation`, 'success');
+    this.notify(`Completed · ${def.title}   +Rs ${def.reward}   +${def.reputation} reputation`, 'success');
   }
   update(dt, playerPosition, canAct = true) {
     for (const [id, state] of Object.entries(this.progress.missions)) {
@@ -94,7 +94,7 @@ export class MissionSystem {
       if (step.kind === 'reach' && distanceXZ(playerPosition, poiPosition(step.target)) < 8) this.event('reach', step.target);
       if (id === 'cafe' && canAct) {
         state.remaining -= dt;
-        if (state.remaining <= 0) { delete this.progress.missions.cafe; this.notify('The café shift ended. Talk to Leo to try another shift.'); this.store.save(); this.onChange(); }
+        if (state.remaining <= 0) { delete this.progress.missions.cafe; this.notify('The tea shop shift ended. Talk to Laxman dai to try another shift.'); this.store.save(); this.onChange(); }
       }
     }
   }

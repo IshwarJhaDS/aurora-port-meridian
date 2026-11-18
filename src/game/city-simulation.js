@@ -17,43 +17,50 @@ import { CityPlayer, FollowCamera } from './player.js';
 import { ProgressStore } from './progress.js';
 import { MissionSystem, REPAIR_LAMPS } from './missions.js';
 import { DialogueSystem } from './dialogue.js';
+import { placeGeneratedProps } from './generated-props.js';
+import { landscape, doonga } from '../world/landmarks.js';
 
 export class CitySimulation {
-  constructor({ storage = null, notify = () => {}, changed = () => {}, release = () => {} } = {}) {
-    this.notify = notify; this.changed = changed; this.release = release;
+  constructor({ storage = null, notify = () => {}, changed = () => {}, release = () => {}, assets = null, sound = () => {} } = {}) {
+    this.sound = sound;
+    this.generated = placeGeneratedProps(assets); this.notify = notify; this.changed = changed; this.release = release;
     this.store = new ProgressStore(storage); this.progress = this.store.load(); this.clock = new FixedStepClock({ hz: 120, maxSubsteps: 12 }); this.elapsed = 0; this.saveTimer = 0; this.routeTimer = 0; this.paused = false; this.keys = new Set(); this.hold = null; this.work = null; this.kickCooldown = 0; this.navTarget = null; this.route = [];
     this.world = new PhysicsWorld({ iterations: 10 }); this.world.groundHeight = terrainHeight;
     this.player = new CityPlayer(this.world, Vec3.from(this.progress.player));
     this.vehicle = new RaycastVehicle(this.world, { position: Vec3.from(this.progress.car) });
     this.vehicle.body.rotation.copy(Quat.axisAngle(new Vec3(0, 1, 0), Math.PI)); this.vehicle.body.previousRotation.copy(this.vehicle.body.rotation);
-    this.vehicle.body.name = 'Your Aster GT'; this.sun = new DayNightCycle(this.progress.minutes / 60); this.weather = new WeatherSystem(); this.weather.restore(this.progress.weather); this.wet = new MovingWetnessField();
+    this.vehicle.body.name = 'Your Maruti'; this.sun = new DayNightCycle(this.progress.minutes / 60); this.weather = new WeatherSystem(); this.weather.restore(this.progress.weather); this.wet = new MovingWetnessField();
     this.camera = new FollowCamera(this.world, this.player, this.vehicle); this.camera.yaw = .2;
     this.graph = new SidewalkGraph(); this.citizens = new CitizenSystem(this.graph); this.traffic = new TrafficSystem();
     this.missions = new MissionSystem(this.store, { notify, onChange: () => { this.routeTimer = 0; this.changed('missions'); } });
     this.dialogue = new DialogueSystem(this.citizens, this.missions, this.store, { navigate: id => this.navigate(id), changed: data => this.changed('dialogue', data) });
-    this.generator = new CityGenerator(); this.chunkObjects = new Map(); this.chunkBodies = new Map(); this.propBodies = new Map(); this.props = new Map(); this.lights = new Map();
+    this.generator = new CityGenerator({ replaced: this.generated.replaced }); this.chunkObjects = new Map(); this.chunkBodies = new Map(); this.propBodies = new Map(); this.props = new Map(); this.lights = new Map();
     this.streamer = new ChunkStreamer(this.generator, { onResident: (c, previous) => this.installChunk(c, previous), onEvict: (c, replaced) => this.removeChunk(c, replaced) });
     this.destruction = new DestructionSystem(this.world, this.progress, { panic: p => this.citizens.panicAt(p), release: object => this.release(object) });
     this.boxMesh = MeshData.box(); this.sphereMesh = MeshData.sphere(10, 6); this.boxes = new InstanceBatch(this.boxMesh, 4096); this.spheres = new InstanceBatch(this.sphereMesh, 1024); this.arena = new FrameArena(128 * 1024);
-    this.environment = this.buildEnvironment(); this.horizon = this.generator.createHorizon();
+    this.environment = [...this.buildEnvironment(), ...this.generated.objects]; this.horizon = this.generator.createHorizon();
+    for (const data of this.generated.colliders) { const body = this.world.add(new RigidBody({ mass: 0, position: new Vec3(data.x, data.y, data.z), half: Vec3.from(data.half) })); body.name = data.id; }
     this.streamer.update(this.player.position);
     // One small initial chunk is prepared before play; subsequent chunks are incremental.
     while (!this.streamer.resident.has(`${Math.floor(this.player.position.x / 80)}:${Math.floor(this.player.position.z / 80)}`) && this.streamer.pending.size) this.streamer.pump(12);
     this.world.updateBroadphase(); this.objects = []; this.interaction = null;
   }
   buildEnvironment() {
-    const land = new GeometryBuilder(), sea = new GeometryBuilder(), boats = new GeometryBuilder();
+    const land = new GeometryBuilder(), sea = new GeometryBuilder(), boats = new GeometryBuilder(), mountains = new GeometryBuilder();
+    landscape(mountains);
     for (let z = -480; z < 560; z += 40) for (let x = -480; x < 436; x += 40) {
       const right = Math.min(x + 40, 436), point = (a, b) => new Vec3(a, terrainHeight(a, b) - .1, b);
       land.quad(point(x, z), point(x, z + 40), point(right, z + 40), point(right, z), z > 230 ? [.23, .29, .16] : [.24, .28, .22]);
     }
     for (let n = -480; n <= 560; n += 80) { if (n < 430) land.box(n, -.02, 40, 7, .009, 520, [.065, .077, .085]); land.box(-22, -.02, n, 458, .009, 7, [.065, .077, .085]); }
-    sea.box(740, -1.05, 40, 305, .035, 700, [.025, .12, .16], material(.12, .55, 0, 0));
-    for (const z of [-120, 65, 215]) {
-      boats.box(484, -.42, z, 3.4, .55, 7, [.22, .28, .29], material(.35, .35)); boats.box(484, .45, z + 1, 2.2, .5, 3, [.63, .62, .52]); boats.box(484, 3.1, z, .09, 2.7, .09, [.35, .37, .33], material(.4, .7));
-    }
+    // Phewa-style lake: greener, calmer water than the old harbor sea.
+    sea.box(740, -1.05, 40, 305, .035, 700, [.02, .11, .12], material(.08, .5, 0, 0));
+    if (!this.generated.replaced.has('boats')) for (const [i, [x, z, yaw]] of [[468, -40, .3], [476, 22, -.5], [462, 92, 1.2], [492, 160, .1], [455, 48, 2.6], [520, -110, .8]].entries()) doonga(boats, x, -.95, z, yaw, i + 3);
+    for (const z of [-60, 140]) { boats.box(445, -.8, z, 2, .25, 9, [.3, .2, .1]); for (const dz of [-8, 0, 8]) boats.box(445, -1.4, z + dz, .15, .9, .15, [.2, .14, .08]); } // wooden ghats
     const water = renderObject(sea.build(), { castShadow: false }); water.water = true;
-    return [renderObject(land.build(), { castShadow: false }), water, renderObject(boats.build(), { castShadow: false })];
+    const objects = [renderObject(land.build(), { castShadow: false }), water, renderObject(mountains.build(), { castShadow: false })];
+    if (boats.indices.length) objects.push(renderObject(boats.build(), { castShadow: false }));
+    return objects;
   }
   installChunk(chunk) {
     const position = new Vec3(chunk.ox, 0, chunk.oz), object = renderObject(chunk.mesh, { position }), ground = renderObject(chunk.groundMesh, { position, castShadow: false });
@@ -82,22 +89,22 @@ export class CitySimulation {
   takeShuttle(id) {
     const destination = poiById(id);
     if (!destination) { this.notify('Select a named place on the map first.'); return false; }
-    if (this.player.inVehicle || !POIS.some(p => distanceXZ(this.player.position, p) < 16)) { this.notify('Board the city shuttle near a named stop, on foot.'); return false; }
-    if (this.progress.cash < 10) { this.notify('A city shuttle trip costs $10 in game money.'); return false; }
+    if (this.player.inVehicle || !POIS.some(p => distanceXZ(this.player.position, p) < 16)) { this.notify('Board the micro bus near a named stop, on foot.'); return false; }
+    if (this.progress.cash < 10) { this.notify('A micro bus ride costs Rs 10 in game money.'); return false; }
     this.progress.cash -= 10;
     const p = poiPosition(id); if (id === 'plaza') p.set(34, .1, 29); else p.y += .1;
     this.player.position.copy(p); this.player.verticalSpeed = 0; this.progress.minutes = (this.progress.minutes + 8) % 1440;
     this.dialogue.close(); this.navTarget = null; this.routeTimer = 0; this.camera.initialized = false; this.streamer.update(p); this.streamer.pump(12);
-    this.missions.update(0, this.player.position, false); this.save(); this.notify(`City shuttle · ${destination.name}   −$10`); return true;
+    this.missions.update(0, this.player.position, false); this.save(); this.sound('bus_horn'); this.notify(`Micro bus · ${destination.name}   −Rs 10`); return true;
   }
   goal() { const objective = this.missions.tracked(); return this.navTarget || (objective ? { position: this.missions.objectivePosition(this.citizens), label: objective.step?.text || objective.definition.title, id: objective.step?.place } : null); }
   getInteraction() {
-    if (this.player.inVehicle) return { kind: 'exit', label: 'Exit Aster GT', key: 'E' };
+    if (this.player.inVehicle) return { kind: 'exit', label: 'Get out of the car', key: 'E' };
     const repair = this.missions.repairNear(this.player.position); if (repair) return { kind: 'repair', label: 'Repair streetlight · hold', target: repair.target, key: 'E' };
     const cafe = this.progress.missions.cafe;
-    if (cafe?.status === 'active' && distanceXZ(this.player.position, poiPosition('cafe')) < 7) return { kind: 'work', label: this.missions.steps('cafe')[cafe.step]?.text || 'Café counter', key: 'E' };
+    if (cafe?.status === 'active' && distanceXZ(this.player.position, poiPosition('cafe')) < 7) return { kind: 'work', label: this.missions.steps('cafe')[cafe.step]?.text || 'Tea shop counter', key: 'E' };
     const citizen = this.citizens.nearest(this.player.position); if (citizen) return { kind: 'talk', label: `Talk to ${citizen.name}`, target: citizen.id, key: 'E' };
-    if (distanceXZ(this.player.position, this.vehicle.body.position) < 4) return { kind: 'enter', label: 'Drive your Aster GT', key: 'E' };
+    if (distanceXZ(this.player.position, this.vehicle.body.position) < 4) return { kind: 'enter', label: 'Drive your Maruti', key: 'E' };
     const poi = POIS.find(p => distanceXZ(this.player.position, p) < 3.8); if (poi) return { kind: 'place', label: `${poi.id === 'warehouse' ? 'Inspect' : 'Visit'} ${poi.name}`, target: poi.id, key: 'E' };
     return null;
   }
@@ -105,15 +112,15 @@ export class CitySimulation {
     if (this.dialogue.current) return;
     const interaction = this.getInteraction(); if (!interaction) return;
     if (interaction.kind === 'talk') this.dialogue.open(this.citizens.get(interaction.target), this.progress.minutes, this.weather);
-    else if (interaction.kind === 'enter') { if (this.player.enter(this.vehicle)) { this.notify('Aster GT · WASD to drive, Space handbrake, E to exit.'); this.camera.distance = 7.5; } }
+    else if (interaction.kind === 'enter') { if (this.player.enter(this.vehicle)) { this.notify('Maruti · WASD to drive, Space handbrake, E to exit. Honk politely.'); this.camera.distance = 7.5; } }
     else if (interaction.kind === 'exit') { if (!this.player.exit(this.vehicle)) this.notify('Slow down and find a clear space to get out.'); }
     else if (interaction.kind === 'repair') this.hold = { target: interaction.target, time: 0, duration: 2.2 };
     else if (interaction.kind === 'work') this.changed('work');
-    else if (interaction.kind === 'place') { this.missions.event('interact', interaction.target); this.notify(poiById(interaction.target).description); }
+    else if (interaction.kind === 'place') { if (['plaza', 'park'].includes(interaction.target)) this.sound('bell'); this.missions.event('interact', interaction.target); this.notify(poiById(interaction.target).description); }
   }
   startWork(action) {
     const state = this.progress.missions.cafe; if (this.work || state?.status !== 'active') return;
-    if (distanceXZ(this.player.position, poiPosition('cafe')) > 7 || !isOpen(poiById('cafe'), this.progress.minutes / 60)) { this.notify('Go to Harbor Coffee while the café is open.'); return; }
+    if (distanceXZ(this.player.position, poiPosition('cafe')) > 7 || !isOpen(poiById('cafe'), this.progress.minutes / 60)) { this.notify('Go to Himalayan Chiya Pasal while the tea shop is open.'); return; }
     const step = this.missions.steps('cafe')[state.step]; if (step.target !== action) { this.notify(`Next, ${step.text.split('·')[1]?.trim() || step.target}`); return; }
     this.work = { action, duration: action === 'brew' ? 2.6 : 1.4, time: 0 }; this.changed('work');
   }
@@ -126,7 +133,7 @@ export class CitySimulation {
   resetVehicle() {
     const p = this.player.position; const x = Math.round(p.x / 80) * 80 + 3.1, z = clamp(p.z + 8, -460, 540), b = this.vehicle.body;
     b.position.set(Math.min(403, x), terrainHeight(x, z) + .8, z); b.rotation.copy(new Quat()); b.velocity.set(0, 0, 0); b.angularVelocity.set(0, 0, 0); b.previousPosition.copy(b.position); b.previousRotation.copy(b.rotation);
-    for (const w of this.vehicle.wheels) { w.omega = 0; w.compression = 0; } this.world.updateBroadphase(); this.notify('Your Aster GT is ready on the nearest road.');
+    for (const w of this.vehicle.wheels) { w.omega = 0; w.compression = 0; } this.world.updateBroadphase(); this.notify('Your Maruti is ready on the nearest road.');
   }
   fixedStep(dt, enabled) {
     const drive = this.player.inVehicle && enabled;

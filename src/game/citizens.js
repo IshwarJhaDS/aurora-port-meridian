@@ -2,32 +2,34 @@ import { Vec3, Quat, clamp } from '../math.js';
 import { Random, hash, poiPosition, POIS, distanceXZ, dampAngle, terrainHeight } from '../world/util.js';
 import { material } from '../world/geometry.js';
 
+// Ids stay stable for saves; voice selects the ElevenLabs cast in src/assets/catalog.js.
 export const NAMED_CITIZENS = Object.freeze([
-  { id: 'mira', name: 'Mira Patel', role: 'Community organizer', place: 'plaza', x: 34, z: 26, outfit: [.32, .16, .1], line: 'A city is made by the people who show up for each other.' },
-  { id: 'leo', name: 'Leo Santos', role: 'Barista', place: 'cafe', x: 104, z: 38, outfit: [.1, .26, .22], line: 'The coffee is strong. The regulars are stronger.' },
-  { id: 'anika', name: 'Dr. Anika Shah', role: 'Clinic physician', place: 'clinic', x: -56, z: 106, outfit: [.7, .74, .68], line: 'A small delivery can make a very big difference here.' },
-  { id: 'tess', name: 'Tess Morgan', role: 'Dispatch coordinator', place: 'depot', x: 184, z: 106, outfit: [.2, .31, .4], line: 'A good courier is someone the neighborhood can count on.' },
-  { id: 'sanjay', name: 'Sanjay Rai', role: 'Harbor electrician', place: 'harbor', x: 344, z: 106, outfit: [.6, .36, .09], line: 'Salt air gets into everything. Keeps me employed.' },
-  { id: 'rosa', name: 'Rosa Bennett', role: 'Market owner', place: 'market', x: -216, z: 40, outfit: [.37, .16, .23], line: 'Westhaven has its own rhythm. Take the time to notice it.' },
-  { id: 'eli', name: 'Eli Brooks', role: 'Gardener', place: 'park', x: -120, z: 196, outfit: [.24, .31, .13], line: 'A quiet place is a useful thing to have in a busy city.' },
-  { id: 'juno', name: 'Juno Park', role: 'Photographer', place: 'waterfront', x: 410, z: 37, outfit: [.13, .22, .34], line: 'Watch what the harbor does when the sun gets low.' }
+  { id: 'mira', name: 'Maya Gurung', role: 'Tole organizer', place: 'plaza', x: 34, z: 26, outfit: [.55, .08, .12], line: 'A tole is made by the people who show up for each other.' },
+  { id: 'leo', topi: [.42, .1, .09], name: 'Laxman Thapa', role: 'Chiya pasal owner', place: 'cafe', x: 104, z: 38, outfit: [.1, .26, .22], line: 'My chiya is strong, but my regulars are stronger.' },
+  { id: 'anika', name: 'Dr. Anjali Shrestha', role: 'Health post doctor', place: 'clinic', x: -56, z: 106, outfit: [.7, .74, .68], line: 'One small delivery can make a very big difference up here.' },
+  { id: 'tess', name: 'Tashi Sherpa', role: 'Courier dispatcher', place: 'depot', x: 184, z: 106, outfit: [.2, .31, .4], line: 'A good courier is someone the whole tole can count on.' },
+  { id: 'sanjay', name: 'Sanjay Rai', role: 'Ghat electrician', place: 'harbor', x: 344, z: 106, outfit: [.6, .36, .09], line: 'Monsoon damp gets into every wire. It keeps me employed.' },
+  { id: 'rosa', name: 'Rasmila Maharjan', role: 'Bazaar shopkeeper', place: 'market', x: -216, z: 40, outfit: [.37, .16, .23], line: 'Newa Tole has its own rhythm. Take the time to notice it.' },
+  { id: 'eli', name: 'Bikash Tamang', role: 'Stupa gardener', place: 'park', x: -120, z: 196, outfit: [.5, .14, .06], line: 'Walk around the stupa clockwise. A quiet mind is a useful thing to have.' },
+  { id: 'juno', name: 'Junu Limbu', role: 'Photographer', place: 'waterfront', x: 410, z: 37, outfit: [.13, .22, .34], line: 'Watch the mountains turn gold when the sun gets low.' }
 ]);
 
 export class CitizenSystem {
   constructor(graph, seed = 811) {
     this.graph = graph; this.agents = []; this.time = 0; this.planningBudget = 0;
-    const random = new Random(seed), skins = [[.58, .36, .23], [.36, .21, .14], [.73, .52, .36], [.82, .65, .5]], outfits = [[.12, .22, .3], [.35, .19, .12], [.26, .29, .14], [.25, .17, .3], [.16, .32, .31], [.57, .44, .25]];
-    const make = data => ({ ...data, position: new Vec3(data.x, terrainHeight(data.x, data.z) + .1, data.z), yaw: random.range(-Math.PI, Math.PI), speed: 0, walkSpeed: random.range(1, 1.45), phase: random.range(0, 6.28), skin: random.pick(skins), hair: random.pick([[.045, .035, .025], [.12, .065, .03], [.18, .16, .13]]), state: data.named ? 'Working' : 'Idle', path: [], pathIndex: 0, targetKey: '', destination: null, wait: random.range(1, 4), panic: 0, talking: false, relations: 0, thought: '', lastUpdate: 0 });
+    const random = new Random(seed), skins = [[.58, .36, .23], [.45, .27, .16], [.66, .46, .31], [.52, .33, .21], [.72, .52, .37]], outfits = [[.12, .22, .3], [.35, .19, .12], [.26, .29, .14], [.25, .17, .3], [.16, .32, .31], [.57, .44, .25]];
+    const make = data => ({ ...data, position: new Vec3(data.x, terrainHeight(data.x, data.z) + .1, data.z), yaw: random.range(-Math.PI, Math.PI), speed: 0, walkSpeed: random.range(1, 1.45), phase: random.range(0, 6.28), skin: random.pick(skins), hair: random.pick([[.02, .018, .015], [.045, .035, .025], [.03, .025, .02], [.18, .16, .13]]), state: data.named ? 'Working' : 'Idle', path: [], pathIndex: 0, targetKey: '', destination: null, wait: random.range(1, 4), panic: 0, talking: false, relations: 0, thought: '', lastUpdate: 0 });
     for (const data of NAMED_CITIZENS) this.agents.push(make({ ...data, named: true }));
-    const firstNames = ['Alex', 'Noor', 'Maya', 'Owen', 'Nadia', 'Ben', 'Sofia', 'Ishan', 'Grace', 'Luca', 'Ava', 'Amir', 'Sam', 'Hazel', 'Kai', 'Priya'];
-    const lastNames = ['Chen', 'Wilson', 'Das', 'Rivera', 'Adams', 'Khan', 'Lee', 'Walker'];
-    const jobs = ['Office worker', 'Shop assistant', 'Nurse', 'Courier', 'Dock worker', 'Student'];
+    const femaleNames = ['Sita', 'Sarita', 'Pema', 'Anita', 'Kabita', 'Dolma', 'Sunita', 'Pratima'], maleNames = ['Ram', 'Hari', 'Bishal', 'Suman', 'Prakash', 'Dawa', 'Rajesh', 'Nabin'];
+    const firstNames = femaleNames.flatMap((f, i) => [f, maleNames[i]]);
+    const lastNames = ['Shrestha', 'Gurung', 'Tamang', 'Magar', 'Adhikari', 'Rai', 'Karki', 'Bajracharya'];
+    const jobs = ['Office worker', 'Shopkeeper', 'Nurse', 'Courier', 'Boatman', 'Student', 'Trekking guide', 'Tailor'];
     const destinations = ['cafe', 'clinic', 'depot', 'market', 'harbor', 'park'];
     const all = [...graph.nodes.values()].filter(n => n.cx >= -3 && n.cx <= 4 && n.cz >= -2 && n.cz <= 3);
     for (let i = 0; i < 72; i++) {
       const home = i < 12 ? graph.nodes.get(`0:0:${i % 8}`) : random.pick(all), job = random.pick(destinations), shift = i % 5 === 0 ? [18, 24] : [8, 17];
       const a = make({ id: `resident-${i}`, name: `${random.pick(firstNames)} ${random.pick(lastNames)}`, role: random.pick(jobs), place: job, x: home.position.x, z: home.position.z, outfit: random.pick(outfits), home: home.id, shift, named: false });
-      a.leisure = random.pick(['park', 'plaza', 'waterfront', 'cafe']); a.localLoop = i < 12 ? i : null; this.agents.push(a);
+      a.voice = femaleNames.includes(a.name.split(' ')[0]) ? 'resident-f' : 'resident-m'; if (a.voice === 'resident-m' && random.next() < .55) a.topi = random.pick([[.42, .1, .09], [.04, .04, .045], [.22, .14, .3]]); a.leisure = random.pick(['park', 'plaza', 'waterfront', 'cafe']); a.localLoop = i < 12 ? i : null; this.agents.push(a);
     }
     this.visible = []; this.random = random;
   }
@@ -116,6 +118,7 @@ export function drawPerson(boxes, spheres, person, time = 0, player = false) {
   spheres.add(headCenter, root, new Vec3(.18, .22, .17), skin, material(.92));
   part(0, 1.52, 0, .09, .18, .1, skin);
   part(0, 1.93, .015, .17, .085, .17, person.hair || [.08, .07, .06]);
+  if (person.topi) { part(0, 2.04, .015, .165, .075, .16, person.topi); part(0, 2.11, .01, .12, .03, .14, person.topi.map(c => c * 1.4)); } // dhaka / bhadgaunle topi
   part(0, 1.78, .13, .08, .06, .045, skin);
   part(0, 1.66, -.178, .05, .06, .04, skin);
   part(-.09, 1.74, -.085, .028, .05, .018, [.08, .08, .09]);

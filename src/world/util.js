@@ -63,12 +63,12 @@ export class MinHeap {
 }
 
 export function districtAt(x, z) {
-  if (x > 420) return { id: 'coast', name: 'Meridian Waterfront', color: '#5ea6b7' };
-  if (z > 230) return { id: 'rural', name: 'Cedar Hills', color: '#8bac72' };
-  if (x > 180) return { id: 'industrial', name: 'East Harbor', color: '#d5ac79' };
-  if (x < -150) return { id: 'suburbs', name: 'Westhaven', color: '#c9b8a0' };
-  if (z < -190) return { id: 'highway', name: 'Northline', color: '#92a2b8' };
-  return { id: 'downtown', name: 'Old Meridian', color: '#9dbaca' };
+  if (x > 420) return { id: 'coast', name: 'Phewa Lakeside', color: '#5ea6b7' };
+  if (z > 230) return { id: 'rural', name: 'Sarangkot Hills', color: '#8bac72' };
+  if (x > 180) return { id: 'industrial', name: 'Ghat Bazaar', color: '#d5ac79' };
+  if (x < -150) return { id: 'suburbs', name: 'Newa Tole', color: '#c9b8a0' };
+  if (z < -190) return { id: 'highway', name: 'Prithvi Highway', color: '#92a2b8' };
+  return { id: 'downtown', name: 'Durbar Tole', color: '#d29a7a' };
 }
 
 export function terrainHeight(x, z) {
@@ -81,18 +81,19 @@ export function terrainHeight(x, z) {
   return hills * field * roadMask;
 }
 
+// Place ids are stable save-game keys; names and descriptions carry the setting.
 export const POIS = Object.freeze([
-  { id: 'plaza', name: 'Founders Square', kind: 'community', x: 40, z: 40, description: 'Meet Mira, take on a story, or watch the city pass by.' },
-  { id: 'cafe', name: 'Harbor Coffee', kind: 'work', x: 104, z: 40, description: 'A neighborhood café. Work the counter or catch up with Leo.', open: [7, 22] },
-  { id: 'clinic', name: 'Meridian Clinic', kind: 'clinic', x: -56, z: 106, description: 'Dr. Anika is waiting for essential deliveries.', open: [6, 23] },
-  { id: 'depot', name: 'Eastside Dispatch', kind: 'work', x: 184, z: 106, description: 'Pick up a parcel and earn an honest delivery fee.', open: [0, 24] },
-  { id: 'harbor', name: 'Harbor Workshop', kind: 'work', x: 344, z: 106, description: 'Sanjay runs repairs along the waterfront.', open: [6, 22] },
-  { id: 'warehouse', name: 'Warehouse 08', kind: 'story', x: 344, z: -56, description: 'There is more to a missing shipment than a misplaced label.' },
-  { id: 'market', name: 'Westhaven Market', kind: 'shop', x: -216, z: 40, description: 'Groceries, neighborhood stories, and a place to rest.' },
-  { id: 'park', name: 'Cedar Gardens', kind: 'park', x: -120, z: 200, description: 'A quiet garden away from the city traffic.' },
-  { id: 'lookout', name: 'Cedar Hill Lookout', kind: 'vista', x: 40, z: 360, description: 'Take the south road to a view over the whole city.' },
-  { id: 'waterfront', name: 'Meridian Promenade', kind: 'vista', x: 410, z: 40, description: 'Walk the harbor, watch the boats, and catch the evening light.' },
-  { id: 'garage', name: 'Aster Motorworks', kind: 'garage', x: 104, z: -56, description: 'Your road car is parked near Founders Square.' }
+  { id: 'plaza', name: 'Durbar Square', kind: 'community', x: 40, z: 40, description: 'The old palace square, its pagoda, and the heart of the tole.' },
+  { id: 'cafe', name: 'Himalayan Chiya Pasal', kind: 'work', x: 104, z: 40, description: 'A busy tea shop. Brew milk chiya, pack momos and chat with Laxman dai.', open: [7, 22] },
+  { id: 'clinic', name: 'Valley Health Post', kind: 'clinic', x: -56, z: 106, description: 'Dr. Anjali is waiting for essential medicine deliveries.', open: [6, 23] },
+  { id: 'depot', name: 'Sajha Courier', kind: 'work', x: 184, z: 106, description: 'Pick up a parcel and earn an honest delivery fee.', open: [0, 24] },
+  { id: 'harbor', name: 'Ghat Workshop', kind: 'work', x: 344, z: 106, description: 'Sanjay dai fixes boats, wiring and anything else by the ghats.', open: [6, 22] },
+  { id: 'warehouse', name: 'Godam 08', kind: 'story', x: 344, z: -56, description: 'There is more to a missing shipment than a misplaced label.' },
+  { id: 'market', name: 'Asan Haat Bazaar', kind: 'shop', x: -216, z: 40, description: 'Spices, brass pots, fresh vegetables and every bit of neighborhood gossip.' },
+  { id: 'park', name: 'Shanti Stupa Garden', kind: 'park', x: -120, z: 200, description: 'Walk clockwise around the stupa and spin the prayer wheels.' },
+  { id: 'lookout', name: 'Sarangkot Viewpoint', kind: 'vista', x: 40, z: 360, description: 'Climb the south road for the Himalaya at sunrise and the valley below.' },
+  { id: 'waterfront', name: 'Phewa Ghat', kind: 'vista', x: 410, z: 40, description: 'Painted doongas, still water and the mountains reflected at dusk.' },
+  { id: 'garage', name: 'Valley Motorworks', kind: 'garage', x: 104, z: -56, description: 'Your car is parked near Durbar Square.' }
 ]);
 export const poiById = id => POIS.find(p => p.id === id);
 export const poiPosition = id => { const p = poiById(id); if (!p) throw new Error(`Unknown place: ${id}`); return new Vec3(p.x, terrainHeight(p.x, p.z), p.z); };

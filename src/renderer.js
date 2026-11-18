@@ -224,6 +224,25 @@ export class Renderer {
     this.requestedTiers=new Set();
     this.ensureTexture(32);
   }
+  // Albedo textures that arrive with generated (Tripo) models, uploaded once per image.
+  imageTexture(image){
+    this.imageTextures??=new Map();
+    let texture=this.imageTextures.get(image);
+    if(texture)return texture;
+    const gl=this.gl;texture=gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D,texture);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.SRGB8_ALPHA8,gl.RGBA,gl.UNSIGNED_BYTE,image);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+    for(const wrap of [gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T])gl.texParameteri(gl.TEXTURE_2D,wrap,gl.REPEAT);
+    const aniso=gl.getExtension('EXT_texture_filter_anisotropic');
+    if(aniso)gl.texParameterf(gl.TEXTURE_2D,aniso.TEXTURE_MAX_ANISOTROPY_EXT,Math.min(8,gl.getParameter(aniso.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
+    this.imageTextures.set(image,texture);
+    return texture;
+  }
   mesh(data){
     if(!this.meshes.has(data))this.meshes.set(data,new GPUMesh(this.gl,data));
     return this.meshes.get(data);
@@ -418,7 +437,7 @@ export class Renderer {
       }
       const distance=distances[index],level=this.lod.select(o.id,o.lods,distance,this.height,camera.fov),mesh=o.lods[level].mesh,material=o.material;
       if(material.textured)this.ensureTexture(distance<15?512:distance<35?128:32);
-      const tier=distance<15?512:distance<35?128:32,texture=material.textured?(this.streamer.get(`./assets/asphalt-${tier}.png`)||this.streamer.get('./assets/asphalt-32.png')||this.white):this.white;
+      const tier=distance<15?512:distance<35?128:32,texture=material.image?this.imageTexture(material.image):material.textured?(this.streamer.get(`./assets/asphalt-${tier}.png`)||this.streamer.get('./assets/asphalt-32.png')||this.white):this.white;
       p.i('uInstanced',o.instances?1:0).i('uVertexMaterials', material.vertexMaterials ? 1 : 0).i('uWater',o.water?1:0).m4('uModel',o.model).v3('uColor',material.color).v3('uEmissive',material.emissive||[0,0,0]).f('uRoughness',material.roughness??.65).f('uMetal',material.metallic??0).f('uWettable',material.wettable??1).f('uUVScale',material.uvScale??1).tex('uAlbedoTex',texture,0);
       if(o.doubleSided)g.disable(g.CULL_FACE);
       this.mesh(mesh).draw(o.instances, o.instanceCount, `${o.id}:${o.instanceVersion}`);
@@ -483,6 +502,8 @@ export class Renderer {
     this.occlusion.dispose();
     for(const lease of this.textureLeases)lease.release();
     this.streamer.dispose();
+    for(const t of this.imageTextures?.values()||[])this.gl.deleteTexture(t);
+    this.imageTextures?.clear();
     for(const m of this.meshes.values())m.dispose();
     for(const p of Object.values(this.programs))p.dispose();
     for(const t of this.textures)g.deleteTexture(t);

@@ -1,0 +1,8 @@
+.env
+.env.local
+.env.*
+!.env.example
+*.part
+assets/generated/**/*.tmp
+node_modules/
+/docs/verification/*.log

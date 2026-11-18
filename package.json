@@ -3,11 +3,17 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "A dependency-free single-player procedural city with streaming, citizens, conversations, work and story missions.",
+  "description": "A dependency-free single-player Nepali lakeside valley (Phewa Valley) with streaming, citizens, conversations, work and story missions; optional Tripo models and ElevenLabs audio.",
   "scripts": {
     "test": "node --test tests/*.test.js",
     "dev": "node tools/serve.mjs",
-    "check": "node tools/check.mjs"
+    "check": "node tools/check.mjs",
+    "assets:models": "node tools/generate-models.mjs",
+    "assets:audio": "node tools/generate-audio.mjs",
+    "assets": "node tools/generate-models.mjs && node tools/generate-audio.mjs",
+    "unity:data": "node tools/export-unity-data.mjs",
+    "tripo:prompts": "node tools/tripo-prompts.mjs",
+    "unity:devanagari": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/render-devanagari.ps1"
   },
   "engines": {
     "node": ">=20"

@@ -2,13 +2,17 @@ import { Renderer } from './renderer.js';
 import { CitySimulation } from './game/city-simulation.js';
 import { CityUI } from './game/city-ui.js';
 import { MapRenderer } from './game/map-renderer.js';
-import { distanceXZ, poiPosition } from './world/util.js';
+import { distanceXZ, poiPosition, districtAt } from './world/util.js';
+import { loadAssetLibrary, EMPTY_LIBRARY } from './assets/library.js';
+import { AudioManager } from './audio/audio-manager.js';
 
 class CityGame {
-  constructor() {
+  constructor(assets = EMPTY_LIBRARY) {
+    this.assets = assets;
     this.canvas = document.getElementById('game-view'); this.renderer = null; this.ui = null; this.disposers = []; this.fps = 0; this.photo = false; this.capturePending = false; this.contextLost = false; this.running = true; this.frames = 0; this.fpsTime = 0; this.last = null; this.resetting = false;
     let storage = null; try { storage = window.localStorage; } catch { storage = null; }
-    this.sim = new CitySimulation({ storage, notify: (text, type) => this.ui?.toast(text, type), changed: (type, data) => this.ui?.changed(type, data), release: object => this.renderer?.releaseObject?.(object) });
+    this.sim = new CitySimulation({ storage, assets, notify: (text, type) => { this.ui?.toast(text, type); if (type === 'success') this.audio?.effect('success'); }, sound: id => this.audio?.effect(id), changed: (type, data) => this.ui?.changed(type, data), release: object => this.renderer?.releaseObject?.(object) });
+    this.audio = new AudioManager(assets.audio, this.sim.progress.settings);
     try { this.renderer = new Renderer(this.canvas); }
     catch (error) {
       if (!/WebGL 2|EXT_color_buffer_float|texture units/.test(error.message)) throw error;
@@ -70,13 +74,23 @@ class CityGame {
         if (this.renderer.mode === 'map') this.renderer.render(); else this.renderer.render(objects, this.sim.camera, this.sim.sun, this.sim.wet, this.sim.elapsed, this.sim.arena);
         this.frames++; this.fpsTime += dt; if (this.fpsTime > .5) { this.fps = this.frames / this.fpsTime; this.frames = 0; this.fpsTime = 0; }
         this.ui.update(dt);
-        if (this.capturePending) { this.capturePending = false; const url = this.canvas.toDataURL('image/png'), anchor = document.createElement('a'); anchor.download = 'Postcard_from_Port_Meridian.png'; anchor.href = url; anchor.click(); this.ui.toast('Postcard captured.'); }
+        this.audio.update({ district: districtAt(this.sim.player.position.x, this.sim.player.position.z).id, position: this.sim.player.position, rain: this.sim.weather.rain, night: Math.max(0, Math.min(1, (.15 - this.sim.sun.direction.y) / .28)), paused: this.sim.paused });
+        if (this.capturePending) { this.capturePending = false; const url = this.canvas.toDataURL('image/png'), anchor = document.createElement('a'); anchor.download = 'Postcard_from_Phewa_Valley.png'; anchor.href = url; anchor.click(); this.ui.toast('Postcard captured.'); }
       }
     } catch (error) { this.fail(error); return; }
     this.raf = requestAnimationFrame(next => this.frame(next));
   }
   fail(error) { console.error(error); this.running = false; document.getElementById('fatal-message').textContent = error.message; document.getElementById('fatal-error').hidden = false; }
-  dispose() { if (!this.running) return; this.running = false; cancelAnimationFrame(this.raf); for (const remove of this.disposers) remove(); window.speechSynthesis?.cancel(); if (!this.resetting) this.sim.dispose(); this.renderer.dispose(); }
+  dispose() { if (!this.running) return; this.running = false; cancelAnimationFrame(this.raf); for (const remove of this.disposers) remove(); window.speechSynthesis?.cancel(); this.audio.dispose(); if (!this.resetting) this.sim.dispose(); this.renderer.dispose(); }
 }
 
-try { window.cityGame = new CityGame(); } catch (error) { console.error(error); document.getElementById('fatal-message').textContent = error.message; document.getElementById('fatal-error').hidden = false; }
+// Generated Tripo/ElevenLabs assets are optional; load whatever exists before the city is built.
+const enter = document.getElementById('enter-city'), enterLabel = enter.innerHTML;
+enter.disabled = true; enter.textContent = 'Preparing the valley…';
+loadAssetLibrary({ onProgress: (done, total) => { enter.textContent = `Loading models ${done}/${total}…`; } })
+  .catch(error => { console.warn('[assets]', error); return EMPTY_LIBRARY; })
+  .then(assets => {
+    enter.disabled = false; enter.innerHTML = enterLabel;
+    if (assets.models.size || Object.keys(assets.audio.voices).length) console.info(`[assets] ${assets.models.size} models, ${Object.keys(assets.audio.ambience).length} ambience loops, ${Object.keys(assets.audio.voices).length} voice clips`);
+    try { window.cityGame = new CityGame(assets); } catch (error) { console.error(error); document.getElementById('fatal-message').textContent = error.message; document.getElementById('fatal-error').hidden = false; }
+  });

@@ -77,7 +77,7 @@ export class FollowCamera {
     this.eye.addScaled(Vec3.sub(desired, this.eye), 1 - Math.exp(-dt * 14));
     this.fov = lerp(this.fov, Math.PI / 3 + (driving ? Math.min(.18, this.vehicle.body.velocity.length() * .004) : 0), 1 - Math.exp(-dt * 4));
   }
-  update(aspect) { this.view = Mat4.lookAt(this.eye, this.target); this.vp = Mat4.mul(Mat4.perspective(this.fov, aspect, .12, 1200), this.view); this.inverseVP = Mat4.invert(this.vp); }
+  update(aspect) { this.view = Mat4.lookAt(this.eye, this.target); this.vp = Mat4.mul(Mat4.perspective(this.fov, aspect, .12, 2600), this.view); this.inverseVP = Mat4.invert(this.vp); }
   project(position, width, height) {
     const p = Mat4.point(this.vp, position), forward = Vec3.sub(position, this.eye).dot(Vec3.sub(this.target, this.eye));
     if (forward <= 0 || p.z > 1 || p.z < -1) return null;

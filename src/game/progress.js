@@ -2,7 +2,7 @@ import { clamp } from '../math.js';
 
 export const SAVE_KEY = 'aurora.port-meridian.v2';
 export function defaultProgress() {
-  return { version: 2, cash: 250, reputation: 0, minutes: 16 * 60 + 20, missions: {}, tracked: 'arrival', receipts: [], conversations: {}, destroyed: [], repaired: [], jobCount: 0, courierCycle: 0, player: [34, 0, 29], car: [15, .75, 49], weather: null, settings: { quality: 'cinematic', sound: false } };
+  return { version: 2, cash: 250, reputation: 0, minutes: 16 * 60 + 20, missions: {}, tracked: 'arrival', receipts: [], conversations: {}, destroyed: [], repaired: [], jobCount: 0, courierCycle: 0, player: [34, 0, 29], car: [15, .75, 49], weather: null, settings: { quality: 'cinematic', sound: true, ambience: true } };
 }
 const finiteVector = (value, fallback) => Array.isArray(value) && value.length === 3 && value.every(x => Number.isFinite(x) && Math.abs(x) < 2000) ? value : fallback;
 export function validateProgress(data) {
@@ -18,7 +18,7 @@ export function validateProgress(data) {
   }
   if (data.conversations && typeof data.conversations === 'object') for (const [id, n] of Object.entries(data.conversations).slice(0, 100)) result.conversations[id] = clamp(Number(n) || 0, 0, 10000);
   if (typeof data.tracked === 'string') result.tracked = data.tracked;
-  if (data.settings) result.settings = { quality: ['performance', 'balanced', 'cinematic'].includes(data.settings.quality) ? data.settings.quality : 'cinematic', sound: Boolean(data.settings.sound) };
+  if (data.settings) result.settings = { quality: ['performance', 'balanced', 'cinematic'].includes(data.settings.quality) ? data.settings.quality : 'cinematic', sound: Boolean(data.settings.sound), ambience: data.settings.ambience !== false };
   result.weather = data.weather; return result;
 }
 

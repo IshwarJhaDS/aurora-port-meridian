@@ -1,9 +1,12 @@
 import { Vec3 } from '../math.js';
 import { GeometryBuilder, renderObject, material } from './geometry.js';
+import { pagoda, stupa, chautari } from './landmarks.js';
 import { CHUNK_SIZE, WORLD_MIN, WORLD_MAX, Random, hash, districtAt, terrainHeight, POIS, keyOf } from './util.js';
 
-const STONE = [.42, .43, .4], PAVING = [.44, .46, .43], ASPHALT = [.065, .077, .085];
-const FACADES = [[.47, .43, .36], [.53, .51, .45], [.29, .37, .39], [.56, .46, .36], [.35, .36, .36], [.55, .57, .53]];
+const STONE = [.42, .43, .4], PAVING = [.46, .4, .34], ASPHALT = [.075, .075, .078];
+// Kathmandu valley palette: exposed Newari brick, lime plaster, ochre and pastel concrete.
+const FACADES = [[.42, .15, .08], [.48, .19, .1], [.36, .13, .075], [.62, .58, .5], [.6, .43, .2], [.45, .5, .52], [.58, .36, .38], [.5, .52, .36]];
+const WOOD = [.11, .055, .028], TANK = [.03, .03, .035], TIN = [[.42, .1, .07], [.13, .27, .2], [.15, .2, .35], [.4, .4, .38]], AWNINGS = [[.6, .06, .05], [.06, .22, .55], [.75, .52, .05], [.08, .4, .2]];
 const GLASS = [.055, .135, .17], METAL = material(.32, .65), WINDOW = material(.16, .45, -.65, .1);
 
 export function describeChunk(cx, cz) {
@@ -19,8 +22,8 @@ export function describeChunk(cx, cz) {
     if (buildings.some(b => Math.abs(b.x - x) < b.hx + 11 && Math.abs(b.z - z) < b.hz + 11)) continue;
     if (district.id === 'rural' && (x !== 25 || z !== 25)) continue;
     const suburb = district.id === 'suburbs' || district.id === 'rural', industrial = district.id === 'industrial' || district.id === 'highway';
-    const height = suburb ? random.range(4.5, 7) : industrial ? random.range(7, 13) : random.range(13, 38) * (cx === 0 || cz === 0 ? 1.25 : 1);
-    buildings.push({ id: `${cx}:${cz}:lot:${x}:${z}`, x, z, hx: suburb ? 8.2 : random.range(8.5, 11), hz: suburb ? 8 : random.range(8, 10.5), height, color: random.pick(FACADES), suburb, industrial });
+    const height = suburb ? random.range(4.5, 7) : industrial ? random.range(6, 10) : random.range(10, 21) * (cx === 0 || cz === 0 ? 1.15 : 1);
+    buildings.push({ id: `${cx}:${cz}:lot:${x}:${z}`, x, z, hx: suburb ? 8.2 : random.range(8.5, 11), hz: suburb ? 8 : random.range(8, 10.5), height, color: random.pick(FACADES), suburb, industrial, roof: random.pick(TIN), awning: random.pick(AWNINGS), flags: random.next() < .65 });
   }
   const props = [], lights = [];
   for (const [i, [x, z]] of [[14, 11], [66, 69]].entries()) {
@@ -40,38 +43,47 @@ export function describeChunk(cx, cz) {
 function tree(g, x, z, seed, y = 0, detailed = true) {
   const r = new Random(seed), h = r.range(2.8, 4.4);
   g.box(x, y + h * .5, z, .16, h * .5, .16, [.18, .12, .075]);
-  g.sphere(x, y + h + .5, z, 1.55, 2.0, 1.5, r.pick([[.12, .24, .13], [.2, .3, .13], [.18, .27, .19]]), material(.95), detailed ? 8 : 6);
+  g.sphere(x, y + h + .5, z, 1.55, 2.0, 1.5, r.pick([[.12, .24, .13], [.2, .3, .13], [.14, .26, .1], [.55, .1, .12]]), material(.95), detailed ? 8 : 6); // the last is a rhododendron in bloom
 }
 
 function building(g, b, level, y = 0) {
   const { x, z, hx, hz, height: h, color } = b;
   g.box(x, y + h / 2, z, hx, h / 2, hz, color);
   g.box(x, y + h + .18, z, hx + .22, .18, hz + .22, [.19, .21, .21], material(.78));
+  const roof = b.roof || TIN[0];
   if (b.suburb) {
-    g.gable(x, y + h + .35, z, hx + .45, 3.1, hz + .5, [.25, .13, .095]);
-    g.box(x + hx * .45, y + h + 1.5, z - hz * .5, .6, 1.6, .65, [.28, .25, .22]);
+    g.pyramid(x, y + h + .3, z, hx + .6, 2.6, hz + .6, roof, material(.5, .45), 1.2, hz * .25);
+    g.box(x + hx * .45, y + h + 1.5, z - hz * .5, .6, 1.6, .65, [.38, .2, .12]);
   } else if (!b.industrial) {
-    g.box(x - hx + .8, y + h + 1.25, z, .6, 1.2, hz * .6, [.3, .33, .32], METAL);
-    if (h > 28) g.box(x + hx * .3, y + h + 1.2, z, hx * .45, 1, hz * .6, color);
-  }
+    // Flat roof terrace: parapet, stair room with a tin canopy and the ubiquitous black water tank.
+    for (const s of [-1, 1]) { g.box(x + s * hx, y + h + .7, z, .14, .5, hz, color); g.box(x, y + h + .7, z + s * hz, hx, .5, .14, color); }
+    g.box(x - hx * .45, y + h + 1.4, z - hz * .4, hx * .35, 1.2, hz * .35, color);
+    g.pyramid(x - hx * .45, y + h + 2.6, z - hz * .4, hx * .42, .9, hz * .42, roof, material(.5, .45), hx * .1, hz * .4);
+    g.cylinder(x + hx * .5, y + h + 1.2, z + hz * .45, .75, .62, TANK, material(.4), 10);
+    if (b.flags) g.prayerFlags(new Vec3(x - hx * .45, y + h + 4.2, z - hz * .4), new Vec3(x + hx * .95, y + h + 1.2, z + hz * .95), .9);
+  } else g.pyramid(x, y + h + .3, z, hx + .3, 1.6, hz + .3, roof, material(.5, .5), hx * .1, hz + .3);
   if (level > 0) return;
   const floors = Math.max(1, Math.min(9, Math.floor(h / 3.5))), cols = b.suburb ? 2 : 4;
   for (let floor = 0; floor < floors; floor++) {
     const wy = y + 2.0 + floor * (h - 2.8) / floors;
-    if (!b.suburb && floor > 0) g.box(x, wy - .75, z, hx + .04, .055, hz + .04, color.map(v => v * .82));
+    if (!b.suburb && floor > 0) g.box(x, wy - .75, z, hx + .1, .07, hz + .1, b.industrial ? color.map(v => v * .82) : WOOD);
     for (let col = 0; col < cols; col++) {
       const wx = x - hx + (col + .5) * hx * 2 / cols, wz = z - hz + (col + .5) * hz * 2 / cols;
       const lit = hash(Math.floor(x + col), floor, Math.floor(z)) % 5 !== 0;
       const surf = lit ? WINDOW : material(.17, .5, 0, .1);
-      g.box(wx, wy, z + hz + .035, b.suburb ? 1.0 : .75, .8, .045, GLASS, surf);
-      g.box(wx, wy, z - hz - .035, b.suburb ? 1.0 : .75, .8, .045, GLASS, surf);
-      g.box(x + hx + .035, wy, wz, .045, .8, .75, GLASS, surf);
-      g.box(x - hx - .035, wy, wz, .045, .8, .75, GLASS, surf);
+      const w = b.suburb ? 1.0 : .75;
+      g.box(wx, wy, z + hz + .035, w, .8, .045, GLASS, surf); g.box(wx, wy, z - hz - .035, w, .8, .045, GLASS, surf);
+      g.box(x + hx + .035, wy, wz, .045, .8, w, GLASS, surf); g.box(x - hx - .035, wy, wz, .045, .8, w, GLASS, surf);
+      if (!b.industrial) { // Carved sal-wood frames with a heavy lintel, as on Newari houses.
+        g.box(wx, wy, z + hz + .02, w + .22, 1.0, .03, WOOD); g.box(wx, wy, z - hz - .02, w + .22, 1.0, .03, WOOD);
+        g.box(x + hx + .02, wy, wz, .03, 1.0, w + .22, WOOD); g.box(x - hx - .02, wy, wz, .03, 1.0, w + .22, WOOD);
+        g.box(wx, wy + 1.06, z + hz + .07, w + .4, .08, .09, WOOD); g.box(wx, wy + 1.06, z - hz - .07, w + .4, .08, .09, WOOD);
+      }
     }
   }
   g.box(x - hx - .05, y + 1.2, z, .08, 1.2, .8, [.055, .07, .075], material(.3, .4));
   if (b.special || (!b.suburb && !b.industrial)) {
-    const awning = b.special === 'cafe' ? [.12, .28, .24] : b.special === 'clinic' ? [.62, .69, .63] : [.18, .23, .27];
+    const awning = b.special === 'cafe' ? [.55, .08, .05] : b.special === 'clinic' ? [.62, .69, .63] : b.awning || AWNINGS[1];
     g.box(x - hx - 1.8, y + 3.4, z, 1.9, .18, Math.min(hz, 7), awning);
     g.box(x - hx - .12, y + 4.1, z, .12, .4, Math.min(hz, 6), [.075, .13, .15], material(.55, .15, -.4));
     // Entry path and an outside service counter keep every mission location accessible.
@@ -108,6 +120,7 @@ function roads(g, plan, level) {
 }
 
 export class CityGenerator {
+  constructor({ replaced = new Set() } = {}) { this.replaced = replaced; }
   describe(cx, cz) { return describeChunk(cx, cz); }
   *build(cx, cz, level = 0, signal = null) {
     const plan = describeChunk(cx, cz), g = new GeometryBuilder(), proxy = new GeometryBuilder(), bodies = [], ground = new GeometryBuilder();
@@ -132,14 +145,14 @@ export class CityGenerator {
       g.box(40, .04, 40, 26, .04, 26, [.49, .47, .4]);
       for (const t of [20, 40, 60]) { g.box(t, .085, 40, .04, .01, 26, [.31, .32, .29]); g.box(40, .085, t, 26, .01, .04, [.31, .32, .29]); }
       if (cx === 0 && cz === 0) {
-        g.cylinder(43, .24, 43, 4.5, .24, [.47, .47, .4], material(.55), 16);
-        g.cylinder(43, .5, 43, 3.9, .04, [.025, .22, .28], material(.08, .45), 16);
-        g.cylinder(43, 1.1, 43, .8, .6, [.6, .57, .46], material(.4), 10);
-        g.sphere(43, 2.1, 43, .75, .75, .75, [.57, .43, .21], material(.16, .9));
-        bodies.push({ id: 'fountain', x: plan.ox + 43, y: .4, z: plan.oz + 43, half: [4, .4, 4] });
+        // Durbar Square: the temple is procedural unless a generated pagoda model is installed.
+        if (!this.replaced.has('pagoda')) { pagoda(g, 47, 0, 47); bodies.push({ id: 'pagoda', x: plan.ox + 47, y: 2.5, z: plan.oz + 47, half: [5.2, 2.5, 5.2] }); }
+        if (!this.replaced.has('chautari')) { chautari(g, 55, 0, 64, 7); bodies.push({ id: 'chautari-square', x: plan.ox + 55, y: .5, z: plan.oz + 64, half: [3.4, .5, 3.4] }); }
         g.box(26, 1.2, 25, .12, 1.2, 1.7, [.13, .17, .18]);
         g.box(26.14, 1.9, 25, .05, .42, 1.4, [.6, .49, .29]);
       }
+      if (cx === -2 && cz === 2 && !this.replaced.has('stupa')) { stupa(g, 40, 0, 54); bodies.push({ id: 'stupa', x: plan.ox + 40, y: 3, z: plan.oz + 54, half: [8.6, 3, 8.6] }); }
+      if (cx === 0 && cz === 4 && !this.replaced.has('chautari')) { const y = terrainHeight(plan.ox + 54, plan.oz + 32); chautari(g, 54, y, 32, 9); bodies.push({ id: 'chautari-lookout', x: plan.ox + 54, y: y + .5, z: plan.oz + 32, half: [3.4, .5, 3.4] }); }
       for (const [x, z] of [[19, 22], [61, 22], [19, 60], [61, 60]]) {
         const y = terrainHeight(plan.ox + x, plan.oz + z);
         g.box(x, y + .5, z, 1.8, .12, .48, [.25, .16, .09]); g.box(x, y + .95, z + .43, 1.8, .45, .08, [.25, .16, .09]);

@@ -4,6 +4,7 @@ import { MeshData } from '../mesh.js';
 const BOX = MeshData.box();
 const sphereCache = new Map();
 export const material = (roughness = .8, metallic = 0, emission = 0, wettable = 1) => [roughness, metallic, emission, wettable];
+export const PRAYER_COLORS = Object.freeze([[.04, .18, .62], [.85, .85, .82], [.72, .06, .04], [.05, .42, .12], [.88, .7, .05]]);
 
 export class GeometryBuilder {
   constructor() { this.positions = []; this.normals = []; this.uvs = []; this.colors = []; this.materials = []; this.indices = []; }
@@ -44,6 +45,30 @@ export class GeometryBuilder {
       const a = i * 2 * Math.PI / segments, b = (i + 1) * 2 * Math.PI / segments;
       const p = new Vec3(x + Math.cos(a) * radius, y - halfHeight, z + Math.sin(a) * radius), q = new Vec3(x + Math.cos(b) * radius, y - halfHeight, z + Math.sin(b) * radius), r = new Vec3(q.x, y + halfHeight, q.z), s = new Vec3(p.x, y + halfHeight, p.z);
       this.quad(q, p, s, r, color, surface); this.quad(new Vec3(x, y + halfHeight, z), r, s, s, color, surface);
+    }
+    return this;
+  }
+  // Quad whose winding is corrected to face away from `inside`, so culling is reliable.
+  facing(inside, a, b, c, d, color, surface = material()) {
+    const n = Vec3.cross(Vec3.sub(b, a), Vec3.sub(c, a)), centre = Vec3.add(Vec3.add(a, b), Vec3.add(c, d)).scale(.25);
+    return n.dot(Vec3.sub(centre, inside)) >= 0 ? this.quad(a, b, c, d, color, surface) : this.quad(d, c, b, a, color, surface);
+  }
+  /** Four-sided roof or frustum: base half extents (hx, hz) shrink to (tx, tz) at y + height. */
+  pyramid(x, y, z, hx, height, hz, color, surface = material(), tx = 0, tz = 0, yaw = 0) {
+    const c = Math.cos(yaw), s = Math.sin(yaw), at = (dx, dy, dz) => new Vec3(x + dx * c + dz * s, y + dy, z - dx * s + dz * c);
+    const base = [at(-hx, 0, -hz), at(hx, 0, -hz), at(hx, 0, hz), at(-hx, 0, hz)], top = [at(-tx, height, -tz), at(tx, height, -tz), at(tx, height, tz), at(-tx, height, tz)];
+    const inside = new Vec3(x, y + height * .3, z);
+    for (let i = 0; i < 4; i++) { const j = (i + 1) % 4; this.facing(inside, base[i], base[j], top[j], top[i], color, surface); }
+    if (tx > 0 || tz > 0) this.facing(new Vec3(x, y, z), top[0], top[1], top[2], top[3], color, surface);
+    this.facing(new Vec3(x, y + 1, z), base[0], base[1], base[2], base[3], color, surface);
+    return this;
+  }
+  /** A sagging string of five-colour prayer flags (blue, white, red, green, yellow) from a to b. */
+  prayerFlags(a, b, sag = .8, spacing = .5) {
+    const length = Vec3.sub(b, a).length(), count = Math.max(2, Math.floor(length / spacing)), yaw = Math.atan2(b.x - a.x, b.z - a.z) + Math.PI / 2;
+    for (let i = 1; i < count; i++) {
+      const t = i / count, p = Vec3.add(a, Vec3.sub(b, a).scale(t)); p.y -= sag * 4 * t * (1 - t);
+      this.box(p.x, p.y - .2, p.z, .17, .19, .012, PRAYER_COLORS[i % 5], material(.9, 0, 0, .6), yaw);
     }
     return this;
   }
