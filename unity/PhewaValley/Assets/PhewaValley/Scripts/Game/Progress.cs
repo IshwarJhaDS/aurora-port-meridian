@@ -75,7 +75,7 @@ namespace PhewaValley
             introWalkDistance = Mathf.Clamp(Finite(introWalkDistance, 0), 0, 4); introDriveDistance = Mathf.Clamp(Finite(introDriveDistance, 0), 0, 40);
             cash = Finite(cash, 250); minutes = Finite(minutes, 980);
             rain = Mathf.Clamp01(Finite(rain, 0)); wetness = Mathf.Clamp01(Finite(wetness, 0)); rainTarget = Mathf.Clamp01(Finite(rainTarget, 0)); weatherSeconds = Mathf.Clamp(Finite(weatherSeconds, 90), 0, 180);
-            hero = Mathf.Clamp(hero, 0, 2); graphics = Mathf.Clamp(graphics, 0, 2); film = Mathf.Clamp(film, 0, 2);
+            hero = Mathf.Clamp(hero, 0, Protagonists.Roster.Count - 1); graphics = Mathf.Clamp(graphics, 0, 2); film = Mathf.Clamp(film, 0, 2);
             density = Mathf.Clamp(density, 0, 2); drawDistance = Mathf.Clamp(drawDistance, 0, 2); day = Mathf.Max(1, day);
             missions ??= new List<MissionState>(); receipts ??= new List<string>(); repaired ??= new List<string>();
             conversations ??= new List<Counter>(); heroPositions ??= new List<Vector3>(); memories ??= new List<string>(); tales ??= new List<string>();
@@ -84,7 +84,7 @@ namespace PhewaValley
             cash = Mathf.Clamp(cash, 0, 10000000); reputation = Mathf.Clamp(reputation, 0, 10000); minutes = ((minutes % 1440) + 1440) % 1440;
             bool Bad(Vector3 v) => float.IsNaN(v.x) || float.IsNaN(v.y) || float.IsNaN(v.z) || v.magnitude > 2000;
             if (Bad(player)) player = new Vector3(34, .1f, 29); if (Bad(car)) car = new Vector3(15, .5f, 49);
-            for (int i = 0; i < heroPositions.Count; i++) if (Bad(heroPositions[i])) heroPositions[i] = Protagonists.Roster[i % 3].home;
+            for (int i = 0; i < heroPositions.Count; i++) if (Bad(heroPositions[i])) heroPositions[i] = Protagonists.Roster[i % Protagonists.Roster.Count].home;
             missions.RemoveAll(m => m == null || string.IsNullOrEmpty(m.id) || (m.status != "active" && m.status != "completed"));
             return this;
         }

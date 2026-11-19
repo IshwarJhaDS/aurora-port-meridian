@@ -109,6 +109,7 @@ export const CHARACTERS = Object.freeze([
   { id: 'rosa', height: 1.58, prompt: `Newari woman shopkeeper in her fifties, black hair, traditional red and black haku patasi sari, shawl, gold earrings, sandals. ${CHARACTER_STYLE}` },
   { id: 'eli', height: 1.68, prompt: `Tamang gardener in his sixties, weathered face, woollen cap, brown jacket, khaki trousers, rubber boots, gardening gloves. ${CHARACTER_STYLE}` },
   { id: 'juno', height: 1.6, prompt: `Limbu woman photographer in her twenties, shoulder-length hair, denim jacket, yellow scarf, jeans, sneakers, DSLR camera on a strap. ${CHARACTER_STYLE}` },
+  { id: 'dhane', height: 1.75, prompt: `Dhane, a Nepali trail scout. ${CHARACTER_STYLE}` },
   { id: 'resident_m', height: 1.7, prompt: `Ordinary Nepali man in his forties, black dhaka topi cap, grey suit jacket over a sweater, dark trousers, leather shoes. ${CHARACTER_STYLE}` },
   { id: 'resident_f', height: 1.58, prompt: `Ordinary Nepali woman in her forties, black hair tied back, bright green kurta suruwal with a dupatta scarf, sandals, cloth shopping bag. ${CHARACTER_STYLE}` },
   { id: 'car', height: 1.5, prompt: 'Small white 2000s Maruti Suzuki 800 style hatchback car as seen on Nepali streets, slightly dusty, Nepali red number plate, realistic, single vehicle, no background' }

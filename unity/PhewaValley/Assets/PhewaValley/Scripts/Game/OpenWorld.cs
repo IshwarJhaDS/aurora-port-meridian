@@ -38,7 +38,8 @@ namespace PhewaValley
         {
             new Hero { id = "kiran", name = "Kiran Gurung", role = "College student", model = "player", outfit = new Color(.17f, .23f, .26f), home = new Vector3(34, 0, 29), bio = "Plays chungi between classes, owes Laxman dai for three chiya, dreams of Lakeside." },
             new Hero { id = "dawa", name = "Dawa Sherpa", role = "Tempo driver", model = "resident_m", outfit = new Color(.2f, .25f, .3f), home = new Vector3(100, 0, 74), bio = "Knows every gali of the valley. Press T in any vehicle to start a passenger shift." },
-            new Hero { id = "sunita", name = "Sunita Shrestha", role = "Kirana pasal owner", model = "resident_f", outfit = new Color(.15f, .45f, .25f), home = new Vector3(-226, 0, 52), bio = "Sharpest bargainer in Newa Tole. Hears every rumour before the radio does." }
+            new Hero { id = "sunita", name = "Sunita Shrestha", role = "Kirana pasal owner", model = "resident_f", outfit = new Color(.15f, .45f, .25f), home = new Vector3(-226, 0, 52), bio = "Sharpest bargainer in Newa Tole. Hears every rumour before the radio does." },
+            new Hero { id = "dhane", name = "Dhane", role = "Trail scout", model = "dhane", outfit = new Color(.27f, .34f, .21f), home = new Vector3(44, 0, 29), bio = "Walks the valley trails before the market opens." }
         };
         public List<Hero> heroes => Roster;
         public bool Switching { get; private set; }

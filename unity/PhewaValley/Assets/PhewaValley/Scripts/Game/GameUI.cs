@@ -47,7 +47,7 @@ namespace PhewaValley
             if (Input.GetKeyDown(KeyCode.P) && panel == Panel.None) { photo = !photo; G.rig.photo = photo; if (photo && World.DistanceXZ(G.player.transform.position, G.data.PoiPosition("lookout")) < 25) G.missions.Event("photo", "lookout"); }
             if (Input.GetKeyDown(KeyCode.V) && panel == Panel.None && !photo) Wipe(() => { G.rig.CycleMode(); Toast($"Camera · {G.rig.ModeName}", false); });
             if (Input.GetKeyDown(KeyCode.Tab) && panel == Panel.None) wheel = !wheel;
-            if (wheel) for (int i = 0; i < 3; i++) if (Input.GetKeyDown(KeyCode.Alpha1 + i)) { wheel = false; G.heroes.Switch(i); }
+            if (wheel) for (int i = 0; i < G.heroes.heroes.Count; i++) if (Input.GetKeyDown(KeyCode.Alpha1 + i)) { wheel = false; G.heroes.Switch(i); }
             if (photo && Input.GetKeyDown(KeyCode.Return)) Capture();
             if (ShowWork && G.progress.Mission("cafe")?.status != "active") ShowWork = false;
         }
@@ -273,15 +273,15 @@ namespace PhewaValley
             GUI.Label(new Rect(r.x + 30, r.y + 84, 660, 90), pop.text, new GUIStyle(Retro.Body) { fontStyle = FontStyle.Italic });
         }
 
-        /// <summary>Character switch wheel: three lives in the same valley.</summary>
+        /// <summary>Character switch wheel: playable residents of the valley.</summary>
         void Wheel(float W, float H)
         {
             Retro.Fill(new Rect(0, 0, W, H), new Color(0, 0, 0, .45f));
-            GUI.Label(new Rect(W / 2 - 400, H / 2 - 270, 800, 40), "SWITCH CHARACTER · press 1, 2 or 3 (TAB to close)", new GUIStyle(Retro.Eyebrow) { fontSize = 18, alignment = TextAnchor.UpperCenter, normal = { textColor = Retro.Paper } });
+            GUI.Label(new Rect(W / 2 - 400, H / 2 - 480, 800, 40), "SWITCH CHARACTER · press 1-4 (TAB to close)", new GUIStyle(Retro.Eyebrow) { fontSize = 18, alignment = TextAnchor.UpperCenter, normal = { textColor = Retro.Paper } });
             var list = G.heroes.heroes;
             for (int i = 0; i < list.Count; i++)
             {
-                var h = list[i]; bool current = i == G.progress.hero; var r = new Rect(W / 2 - 570 + i * 390, H / 2 - 210, 360, 400); Retro.PaperPanel(r);
+                var h = list[i]; bool current = i == G.progress.hero; var r = new Rect(W / 2 - 375 + (i % 2) * 390, H / 2 - 420 + (i / 2) * 420, 360, 400); Retro.PaperPanel(r);
                 Retro.Fill(new Rect(r.x + 24, r.y + 28, 70, 70), h.outfit); GUI.Label(new Rect(r.x + 24, r.y + 28, 70, 70), Retro.Devanagari(i + 1), new GUIStyle(Retro.Title) { alignment = TextAnchor.MiddleCenter, normal = { textColor = Retro.Paper } });
                 GUI.Label(new Rect(r.x + 108, r.y + 30, 230, 34), h.name, Retro.Heading); GUI.Label(new Rect(r.x + 108, r.y + 66, 230, 24), h.role.ToUpperInvariant(), Retro.Eyebrow);
                 GUI.Label(new Rect(r.x + 24, r.y + 118, 312, 160), h.bio, Retro.Body);
