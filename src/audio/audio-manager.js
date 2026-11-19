@@ -44,7 +44,13 @@ export class AudioManager {
     const talking = t < (this.voiceUntil || 0);
     this.master.gain.setTargetAtTime(enabled || talking ? 1 : 0, t, .2);
     this.ambienceBus.gain.setTargetAtTime(enabled ? (talking ? .18 : paused ? .25 : .55) : 0, t, talking ? .15 : .4);
-    this.musicBus.gain.setTargetAtTime(enabled ? (paused ? .38 : .14) : 0, t, .8);
+    this.musicBus.gain.setTargetAtTime(enabled ? (talking ? .08 : paused ? .45 : .32) : 0, t, .8);
+    const desiredMusic = paused ? 'theme' : night > .5 ? 'night' : district === 'coast' || district === 'rural' ? 'exploration' : 'theme';
+    const selectedMusic = this.audio.music[desiredMusic] ? desiredMusic : 'theme';
+    for (const [id, file] of Object.entries(this.audio.music)) {
+      const track = this.loop(`music:${id}`, BASE + file, this.musicBus);
+      track.gain.gain.setTargetAtTime(id === selectedMusic ? 1 : 0, t, 1.2);
+    }
     let temple = 0;
     if (position) for (const p of TEMPLES) temple = Math.max(temple, 1 - Math.hypot(position.x - p.x, position.z - p.z) / 55);
     temple = Math.max(0, temple);

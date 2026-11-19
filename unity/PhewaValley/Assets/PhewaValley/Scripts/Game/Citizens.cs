@@ -13,6 +13,12 @@ namespace PhewaValley
         /// <summary>Set while in conversation: drives gestures. LookAt turns the head toward a point.</summary>
         public bool Talking; public Vector3? LookAt; float phase;
         /// <summary>True when the model brought its own animation clips (emotes are available).</summary>
+        public IReadOnlyList<string> ClipNames => clips?.ClipNames;
+        public bool HasClip(string name) => clips != null && clips.Find(name) != null;
+        public float ClipDuration(string name) => clips?.Duration(name) ?? 0;
+        public bool PlayClip(string name, Act flags, float speed = 1) => clips != null && clips.PlayClip(name, flags, speed);
+        public bool QueueClip(string name, Act flags, float speed = 1) => clips != null && clips.QueueClip(name, flags, speed);
+        public bool Crouching;
         public bool HasClips => clips != null;
         /// <summary>Plays a one-off clip such as "Nepali namaste"; false if this model cannot.</summary>
         public bool Emote(string clip) => clips != null && clips.Emote(clip);
@@ -28,7 +34,7 @@ namespace PhewaValley
         public bool Climbing;
         public bool Busy => clips != null && clips.Busy;
         public bool Emoting => clips != null && clips.Emoting;
-        public void ResetPose() { clips?.ResetPose(); Speed = 0; Airborne = Climbing = false; }
+        public void ResetPose() { clips?.ResetPose(); Speed = 0; Airborne = Climbing = Crouching = false; }
         public float Speed { get; set; }
         /// <summary>Degrees the arms lift from the sides (used for waving, kite flying, playing).</summary>
         public float ArmOut { get; set; }
@@ -61,7 +67,7 @@ namespace PhewaValley
 
         void Update()
         {
-            if (clips != null) { clips.LookAt = LookAt; clips.Airborne = Airborne; clips.Climbing = Climbing; clips.Tick(Time.deltaTime, Speed, Talking); return; }
+            if (clips != null) { clips.Crouching = Crouching; clips.LookAt = LookAt; clips.Airborne = Airborne; clips.Climbing = Climbing; clips.Tick(Time.deltaTime, Speed, Talking); return; }
             phase += Time.deltaTime * (2 + Speed * 2.4f);
             float swing = Mathf.Sin(phase) * Mathf.Clamp01(Speed / 3) * 40;
             if (anim != null) { anim.Tick(transform, Time.deltaTime, Speed, ArmOut, Talking, LookAt); return; }
@@ -75,7 +81,7 @@ namespace PhewaValley
     public class Citizen : MonoBehaviour
     {
         public string Id, displayName, role, place, line, voice; public bool named, talking, fleeing; public Color outfit;
-        public Figure figure; internal List<Vector3> path = new List<Vector3>(); internal float wait, panic, walkSpeed = 1.2f; internal Vector3 fleeFrom;
+        public Figure figure; internal List<Vector3> path = new List<Vector3>(); internal float wait, panic, walkSpeed = 1.2f; internal Vector3 fleeFrom, home;
     }
 
     public class Citizens : MonoBehaviour
@@ -115,7 +121,7 @@ namespace PhewaValley
         {
             var go = new GameObject(name) { layer = 2 }; go.transform.SetParent(transform, false); go.transform.position = position + Vector3.up * .02f; // layer 2: the camera ignores people
             go.transform.rotation = Quaternion.Euler(0, random.Range(0, 360), 0);
-            var a = go.AddComponent<Citizen>(); a.Id = id; a.displayName = name; a.role = role; a.place = place; a.line = line; a.named = named; a.outfit = outfit;
+            var a = go.AddComponent<Citizen>(); a.home = go.transform.position; a.Id = id; a.displayName = name; a.role = role; a.place = place; a.line = line; a.named = named; a.outfit = outfit;
             var hair = random.Next() < .2f ? new Color(.18f, .16f, .13f) : new Color(.025f, .02f, .018f);
             a.figure = Figure.Create(go.transform, modelId, outfit, random.Pick(Skins), hair, topi, models, named && modelId != null ? 1.7f : random.Range(1.58f, 1.76f));
             var col = go.AddComponent<CapsuleCollider>(); col.center = new Vector3(0, .9f, 0); col.height = 1.8f; col.radius = .3f;
@@ -176,6 +182,12 @@ namespace PhewaValley
                         if (d.magnitude < .4f) { a.path.RemoveAt(0); if (random.Next() < .3f) a.wait = random.Range(1.5f, 5); }
                         else { speed = a.walkSpeed; Move(t, d.normalized, speed, dt); }
                     }
+                }
+                else if (World.DistanceXZ(t.position, a.home) > .15f)
+                {
+                    var homeward = a.home - t.position; homeward.y = 0;
+                    speed = a.walkSpeed;
+                    Move(t, homeward.normalized, speed, Mathf.Min(dt, homeward.magnitude / speed));
                 }
                 else if (dist < 6) Face(t, pp - t.position, dt * 2);
                 a.figure.Speed = speed;

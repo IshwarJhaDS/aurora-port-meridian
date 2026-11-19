@@ -102,7 +102,9 @@ namespace PhewaValley
         readonly List<Vector3> restPositions = new List<Vector3>(), restScales = new List<Vector3>();
         readonly List<Quaternion> restRotations = new List<Quaternion>();
         readonly CharacterController controller; readonly Vector3 baseLocal; static readonly RaycastHit[] hits = new RaycastHit[8];
-        readonly AnimationState walk, run, idle, look, jump, upstairs, walkSeam, runSeam;
+        readonly AnimationState walk, run, idle, look, jump, upstairs, walkSeam, runSeam, crouchIdle, crouchWalk, falling;
+        public bool Crouching;
+        public readonly List<string> ClipNames = new List<string>();
         readonly List<AnimationState> talkGestures = new List<AnimationState>();
         readonly Dictionary<AnimationState, Vector3> initialOffset = new Dictionary<AnimationState, Vector3>();
         readonly Dictionary<AnimationState, Vector3> drift = new Dictionary<AnimationState, Vector3>();
@@ -138,9 +140,11 @@ namespace PhewaValley
             anim.enabled = false; controller = root.GetComponentInParent<CharacterController>();
             foreach (var bone in root.GetComponentsInChildren<Transform>(true)) if (bone != root)
             { poseBones.Add(bone); restPositions.Add(bone.localPosition); restRotations.Add(bone.localRotation); restScales.Add(bone.localScale); }
+            foreach (AnimationState source in anim) ClipNames.Add(source.name);
+            crouchIdle = Find("crouch_idle"); crouchWalk = Find("crouch_walk"); falling = Find("fall_prepare");
             walk = Find("walk"); run = Find("run"); look = Find("look_around"); jump = Find("jump"); upstairs = Find("run_upstairs");
             idle = Find("standing_relax") ?? Find("idle") ?? walk;
-            foreach (var g in new[] { "agree", "greet_03" }) { var s = Find(g); if (s != null) talkGestures.Add(s); }
+            foreach (var g in new[] { "agree", "greet_03", "listen_and_agree" }) { var s = Find(g); if (s != null) talkGestures.Add(s); }
             // A second copy of each locomotion clip, held on its first frame, smooths the jump where a loop
             // restarts (Tripo's run ends 19.5 degrees away from where it starts in the right arm).
             if (walk != null) { anim.AddClip(walk.clip, "walk~seam"); walkSeam = anim["walk~seam"]; }
@@ -164,8 +168,20 @@ namespace PhewaValley
         {
             var k = Key(name);
             foreach (AnimationState s in anim) if (Key(s.name) == k) return s;
+            string source = DhaneAnimations.Source(name);
+            if (source != name) foreach (AnimationState s in anim) if (s.name == source) return s;
+            string alias = k == "climb" ? "ledge_climb" : k == "greet01" ? "wave" : k == "hittoside" ? "hit_right" : null;
+            if (alias != null)
+            {
+                source = DhaneAnimations.Source(alias);
+                foreach (AnimationState s in anim) if (s.name == source) return s;
+            }
             return null;
         }
+
+        public float Duration(string name) => Find(name)?.length ?? 0;
+        public bool PlayClip(string name, Act flags, float speed = 1) => Action(name, 0, float.MaxValue, speed, flags);
+        public bool QueueClip(string name, Act flags, float speed = 1) => Then(name, 0, float.MaxValue, speed, flags);
 
         /// <summary>Ground speed (m/s) a locomotion clip covers at normal playback, at this model's scale.</summary>
         float NaturalSpeed(AnimationState s, float fallback)
@@ -181,7 +197,7 @@ namespace PhewaValley
         /// </summary>
         public bool Emote(string name)
         {
-            if (Key(name) == "namaste") { if (armL == null || armR == null) return false; Clear(); namaste = 0; return true; }
+            if (Key(name) == "namaste" && Find(name) == null) { if (armL == null || armR == null) return false; Clear(); namaste = 0; return true; }
             var s = Find(name); if (s == null) return false;
             return Action(name, 0, MaxLength.TryGetValue(s.name, out var max) ? max : s.length, 1, Act.None);
         }
@@ -227,7 +243,19 @@ namespace PhewaValley
         void Start(Play p) { current = p; actionFlags[p.s] = p.flags; p.s.wrapMode = WrapMode.ClampForever; p.s.speed = 0; p.s.time = p.from; p.s.enabled = true; }
 
         /// <summary>Take-off: plays the biggest hop of the "jump" clip, stretched to the controller's time in the air.</summary>
-        public void Jump(float airTime) => Action("jump", .45f, .95f, .5f / Mathf.Max(.2f, airTime), Act.CancelLift | Act.WhileMoving | Act.EndOnLand);
+        public void Jump(float airTime)
+        {
+            var takeoff = Find("jump_takeoff");
+            if (takeoff == null)
+            {
+                Action("jump", .45f, .95f, .5f / Mathf.Max(.2f, airTime), Act.CancelLift | Act.WhileMoving | Act.EndOnLand);
+                return;
+            }
+            var flags = Act.PinXZ | Act.CancelLift | Act.WhileMoving | Act.EndOnLand | Act.NoPlant;
+            PlayClip("jump_takeoff", flags, takeoff.length / .18f);
+            float duration = Duration("jump_air");
+            if (duration > 0) QueueClip("jump_air", flags, duration / Mathf.Max(.2f, airTime - .18f));
+        }
 
         public bool Emoting => current != null || namaste >= 0;
         /// <summary>True while an action that the controller is driving (or a jump) is playing.</summary>
@@ -257,6 +285,16 @@ namespace PhewaValley
             seamK = 0;
             stairs = Mathf.MoveTowards(stairs, Climbing && moving && upstairs != null ? 1 : 0, dt * 4);
             if (current != null) want[current.s] = 1;
+            else if (Airborne && falling != null)
+            {
+                Hold(falling, .5f); want[falling] = 1;
+            }
+            else if (Crouching && crouchIdle != null)
+            {
+                var crouch = moving && crouchWalk != null ? crouchWalk : crouchIdle;
+                phase = (phase + dt * Mathf.Max(.3f, speed / 1.2f) / Mathf.Max(.1f, crouch.length)) % 1;
+                Hold(crouch, phase); want[crouch] = 1;
+            }
             else if (moving && walk != null)
             {
                 // Blend walk -> run by speed, both locked to one phase so the feet stay in step;

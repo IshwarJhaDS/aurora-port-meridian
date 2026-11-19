@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "models": {},
+  "audio": {
+    "ambience": {
+      "bazaar": "ambience/bazaar.mp3",
+      "temple": "ambience/temple.mp3",
+      "lake": "ambience/lake.mp3",
+      "hills": "ambience/hills.mp3",
+      "night": "ambience/night.mp3",
+      "rain": "ambience/rain.mp3"
+    },
+    "effects": {
+      "bell": "effects/bell.mp3",
+      "success": "effects/success.mp3",
+      "bus_horn": "effects/bus_horn.mp3",
+      "step_stone": "effects/step_stone.mp3",
+      "step_road": "effects/step_road.mp3",
+      "step_grass": "effects/step_grass.mp3",
+      "land_soft": "effects/land_soft.mp3",
+      "land_heavy": "effects/land_heavy.mp3",
+      "blade_swing": "effects/blade_swing.mp3",
+      "cloth_whoosh": "effects/cloth_whoosh.mp3",
+      "vehicle_impact": "effects/vehicle_impact.mp3",
+      "bow_release": "effects/bow_release.mp3",
+      "ui_confirm": "effects/ui_confirm.mp3",
+      "engine_loop": "effects/engine_loop.mp3"
+    },
+    "music": {
+      "theme": "music/theme.mp3",
+      "night": "music/night.mp3",
+      "exploration": "music/exploration.mp3",
+      "tension": "music/tension.mp3"
+    },
+    "voices": {}
+  },
+  "updated": "2026-11-19T22:32:13.908Z"
+}

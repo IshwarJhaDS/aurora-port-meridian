@@ -104,6 +104,49 @@ namespace PhewaValley
             animator.ResetPose(); animator.Tick(0, 0, false); animator.LateTick();
             check(!animator.Emoting && Sole(model) > -.09f, "reset clears actions and restores Kiran to standing");
             UnityEngine.Object.Destroy(actor);
+
+            loading = library.LoadCharacter("dhane");
+            while (!loading.IsCompleted) yield return null;
+            check(!loading.IsFaulted && loading.Result, "Dhane animated model loads");
+            if (loading.IsFaulted || !loading.Result) yield break;
+            actor = new GameObject("Dhane animation checks");
+            actor.transform.position = new Vector3(45, 0, 40);
+            model = library.InstantiateCharacter("dhane", actor.transform, 1.75f);
+            animator = new ClipAnimator(model.transform, model.GetComponentInChildren<Animation>());
+            actualMotion = model.GetComponent<ClipMotion>();
+            check(animator.ClipNames.Count == 56, "all 56 Dhane source animations are exposed");
+            foreach (var entry in DhaneAnimations.All)
+            {
+                bool plays = animator.PlayClip(entry.key, Act.PinXZ | Act.WhileMoving | Act.NoPlant);
+                bool valid = plays;
+                float duration = animator.Duration(entry.key);
+                var bonesToCheck = model.GetComponentsInChildren<Transform>();
+                for (int frame = 0; frame < 30 && plays; frame++)
+                {
+                    animator.Tick(duration / 31, 0, false); animator.LateTick();
+                    foreach (var bone in bonesToCheck)
+                    {
+                        var position = bone.position;
+                        valid &= !float.IsNaN(position.x) && !float.IsNaN(position.y) && !float.IsNaN(position.z) &&
+                            !float.IsInfinity(position.sqrMagnitude);
+                    }
+                    var local = model.transform.InverseTransformPoint(actualMotion.hips.position);
+                    valid &= Vector2.Distance(new Vector2(local.x, local.z), actualMotion.hipsRestXZ) < .01f;
+                }
+                check(valid, $"Dhane {entry.label} resolves, samples and stays over its capsule");
+                animator.ResetPose();
+            }
+            animator.Airborne = true; animator.Jump(.7f);
+            animator.Tick(.25f, 0, false); animator.LateTick();
+            check(animator.Busy, "Dhane takeoff transitions into airborne animation");
+            animator.Airborne = false;
+            animator.PlayClip("land_soft", Act.PinXZ | Act.WhileMoving);
+            animator.Tick(.1f, 0, false); animator.LateTick();
+            check(animator.Emoting, "Dhane soft landing replaces the airborne sequence");
+            animator.ResetPose(); animator.Tick(0, 0, false); animator.LateTick();
+            sole = Sole(model);
+            check(!animator.Emoting && sole > -.09f && sole < .12f, $"Dhane returns to a grounded idle ({sole:0.000} m)");
+            UnityEngine.Object.Destroy(actor);
         }
     }
 }

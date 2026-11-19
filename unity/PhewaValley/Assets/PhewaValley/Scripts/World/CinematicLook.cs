@@ -1,11 +1,5 @@
-// Film-like rendering on the built-in pipeline: ACES tone mapping, a time-of-day colour grade,
-// bloom with warm film halation, ambient occlusion, vignette, grain, a hint of lens fringing,
-// SMAA, a sky reflection probe and better shadows.
-//
-// Colour grade: keyframed through the day. Dawn is violet and rose; day is warm highlights over teal
-// shadows ("orange and teal"); golden hour is amber; blue hour is cobalt; night is moonlit blue.
-// Monsoon rain pulls everything toward a soft, desaturated green-grey, and load-shedding nights
-// lean candle-warm. Three film looks sit on top: 2000s Kodak (default), Natural and Kurosawa B&W.
+// HDR tone mapping with restrained color grading, bloom and ambient occlusion.
+// Clear and Natural preserve material colors. Monochrome retains its film grain.
 using UnityEngine;
 using UnityEngine.Rendering.PostProcessing;
 
@@ -16,8 +10,8 @@ namespace PhewaValley
         PostProcessVolume volume; ColorGrading grading; Bloom bloom; Vignette vignette; AmbientOcclusion ao; Grain grain; ChromaticAberration fringe;
         PostProcessLayer layer; Camera cam; ReflectionProbe probe; float probeTimer, probeEvery = 6; int quality = 1;
         public static readonly string[] QualityNames = { "Performance", "Balanced", "Cinematic" };
-        public static readonly string[] FilmNames = { "2000s Kodak", "Natural", "Kurosawa B&W" };
-        /// <summary>0 = 2000s Kodak (warm film, faded blacks) Â· 1 = Natural Â· 2 = Kurosawa black and white.</summary>
+        public static readonly string[] FilmNames = { "Kung Fu Cinema", "Natural", "Kurosawa B&W" };
+        /// <summary>0 = Clear Â· 1 = Natural Â· 2 = Kurosawa black and white.</summary>
         public int film;
 
         public void Init(Camera cam, int quality = 1)
@@ -38,11 +32,11 @@ namespace PhewaValley
             var profile = ScriptableObject.CreateInstance<PostProcessProfile>();
             grading = profile.AddSettings<ColorGrading>(); grading.enabled.Override(true);
             grading.gradingMode.Override(GradingMode.HighDefinitionRange); grading.tonemapper.Override(Tonemapper.ACES);
-            bloom = profile.AddSettings<Bloom>(); bloom.enabled.Override(true); bloom.intensity.Override(1.4f); bloom.threshold.Override(1.05f); bloom.softKnee.Override(.6f); bloom.diffusion.Override(7);
+            bloom = profile.AddSettings<Bloom>(); bloom.enabled.Override(true); bloom.intensity.Override(.25f); bloom.threshold.Override(1.25f); bloom.softKnee.Override(.6f); bloom.diffusion.Override(7);
             ao = profile.AddSettings<AmbientOcclusion>(); ao.enabled.Override(true); ao.mode.Override(AmbientOcclusionMode.MultiScaleVolumetricObscurance); ao.intensity.Override(.75f); ao.thicknessModifier.Override(1.4f);
-            vignette = profile.AddSettings<Vignette>(); vignette.enabled.Override(true); vignette.intensity.Override(.26f); vignette.smoothness.Override(.45f); vignette.roundness.Override(.85f);
-            grain = profile.AddSettings<Grain>(); grain.enabled.Override(true); grain.intensity.Override(.16f); grain.size.Override(1.1f); grain.colored.Override(false);
-            fringe = profile.AddSettings<ChromaticAberration>(); fringe.enabled.Override(true); fringe.intensity.Override(.05f); fringe.fastMode.Override(true);
+            vignette = profile.AddSettings<Vignette>(); vignette.enabled.Override(true); vignette.intensity.Override(.08f); vignette.smoothness.Override(.45f); vignette.roundness.Override(.85f);
+            grain = profile.AddSettings<Grain>(); grain.enabled.Override(false); grain.intensity.Override(.16f); grain.size.Override(1.1f); grain.colored.Override(false);
+            fringe = profile.AddSettings<ChromaticAberration>(); fringe.enabled.Override(false); fringe.intensity.Override(.05f); fringe.fastMode.Override(true);
             volume = PostProcessManager.instance.QuickVolume(0, 100, profile.settings.ToArray()); volume.transform.SetParent(transform, false);
             Apply(quality);
         }
@@ -53,11 +47,12 @@ namespace PhewaValley
             quality = Mathf.Clamp(q, 0, 2);
             QualitySettings.shadowCascades = quality == 2 ? 4 : 2; QualitySettings.shadowDistance = new[] { 70f, 110f, 170f }[quality];
             QualitySettings.shadowResolution = quality == 2 ? ShadowResolution.VeryHigh : ShadowResolution.High;
-            QualitySettings.antiAliasing = quality == 2 ? 4 : 0; if (cam) cam.allowMSAA = quality == 2; probeEvery = quality == 2 ? 3 : 8;
+            QualitySettings.antiAliasing = quality == 0 ? 0 : 4; if (cam) cam.allowMSAA = quality > 0;
+            QualitySettings.pixelLightCount = quality == 0 ? 2 : 4; probeEvery = quality == 2 ? 3 : 8;
             if (layer) layer.antialiasingMode = quality == 0 ? PostProcessLayer.Antialiasing.FastApproximateAntialiasing : PostProcessLayer.Antialiasing.SubpixelMorphologicalAntialiasing;
-            if (ao != null) { ao.enabled.Override(quality == 2); ao.mode.Override(quality == 2 ? AmbientOcclusionMode.MultiScaleVolumetricObscurance : AmbientOcclusionMode.ScalableAmbientObscurance); ao.intensity.Override(quality == 2 ? .75f : .55f); ao.quality.Override(AmbientOcclusionQuality.Low); }
-            if (grain != null) grain.enabled.Override(quality > 0 || film == 2);
-            if (fringe != null) fringe.enabled.Override(quality > 0);
+            if (ao != null) { ao.enabled.Override(quality > 0); ao.mode.Override(quality == 2 ? AmbientOcclusionMode.MultiScaleVolumetricObscurance : AmbientOcclusionMode.ScalableAmbientObscurance); ao.intensity.Override(quality == 2 ? .45f : .3f); ao.quality.Override(AmbientOcclusionQuality.Medium); }
+            if (grain != null) grain.enabled.Override(film == 2);
+            if (fringe != null) fringe.enabled.Override(false);
         }
 
         // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Time-of-day grade â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -113,27 +108,33 @@ namespace PhewaValley
             g = Grade.Lerp(g, Monsoon, Mathf.Clamp01(rain) * .85f);
             if (powerCut) g = Grade.Lerp(g, Candle, night * .45f);
 
-            float strength = film == 1 ? .45f : .75f;                       // Natural: half-strength grade
-            Vector4 fade = film == 0 ? new Vector4(.012f, .008f, 0, .018f) : Vector4.zero; // Kodak: lifted, faded blacks
+            if (film == 0)
+                g = G(10, -3, -7, 9, Mathf.Lerp(.15f, .65f, night),
+                    new Vector4(-.006f, .008f, .004f, .025f),
+                    new Vector4(.015f, .005f, -.01f, .02f),
+                    new Vector4(.025f, .012f, -.015f, 0),
+                    new Color(1f, .91f, .76f));
+            float strength = film == 0 ? 1f : .3f;                       // Clear uses the lightest time-of-day tint
+            Vector4 fade = Vector4.zero; // Preserve the black point
             grading.temperature.Override(g.temp * strength);
             grading.tint.Override(g.tint * strength);
             grading.lift.Override(g.lift * strength + fade);
             grading.gamma.Override(g.gamma * strength);
             grading.gain.Override(g.gain * strength);
-            grading.contrast.Override(film == 2 ? 38 : g.contrast * (film == 1 ? .7f : .85f));
-            grading.saturation.Override(film == 2 ? -100 : g.sat * strength + (film == 0 ? 2 : 0));
-            grading.postExposure.Override(g.exposure - rain * .1f + (film == 2 ? -.15f : 0));
+            grading.contrast.Override(film == 2 ? 28 : film == 0 ? g.contrast : g.contrast * .35f);
+            grading.saturation.Override(film == 2 ? -100 : g.sat * strength);
+            grading.postExposure.Override((film == 0 ? g.exposure : Mathf.Lerp(g.exposure, .1f, 1 - night)) - rain * .1f + (film == 2 ? -.15f : 0));
             // Kurosawa B&W: a red filter on black-and-white film darkens blue skies and brightens skin.
-            grading.colorFilter.Override(film == 2 ? new Color(1f, .82f, .55f) : Color.white);
+            grading.colorFilter.Override(film == 2 ? new Color(1f, .9f, .75f) : Color.white);
             grading.mixerRedOutRedIn.Override(film == 2 ? 120 : 100);
             grading.mixerRedOutBlueIn.Override(film == 2 ? -20 : 0);
 
-            bloom.intensity.Override(Mathf.Lerp(.65f, 1.5f, night) * (film == 2 ? .8f : 1));
-            bloom.color.Override(film == 0 ? g.bloomTint : film == 2 ? Color.white : Color.Lerp(Color.white, g.bloomTint, .4f)); // warm halation around highlights
-            vignette.intensity.Override((film == 2 ? .36f : .16f) + rain * .1f - night * .06f);
-            grain.enabled.Override(quality > 0 || film == 2);
+            bloom.intensity.Override(Mathf.Lerp(.18f, .45f, night) * (film == 2 ? .8f : 1));
+            bloom.color.Override(film == 2 ? Color.white : Color.Lerp(Color.white, g.bloomTint, .15f)); // Restrained highlight tint
+            vignette.intensity.Override((film == 2 ? .25f : .06f) + rain * .1f - night * .06f);
+            grain.enabled.Override(film == 2);
             grain.intensity.Override(film == 2 ? .24f : film == 0 ? .075f : .035f); grain.size.Override(film == 2 ? 1.5f : 1.1f);
-            fringe.intensity.Override(film == 1 ? 0 : .015f);
+            fringe.intensity.Override(0);
         }
     }
 }

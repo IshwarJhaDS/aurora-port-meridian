@@ -29,7 +29,7 @@ namespace PhewaValley
             var p = new GameObject("Test Kiran").AddComponent<PlayerController>(); p.Init(null);
             p.inputEnabled = false;
             float lowestJump = float.MaxValue, highestJump = 0;
-            foreach (int fps in new[] { 30, 60, 120 })
+            foreach (int fps in new[] { 15, 30, 60, 120, 144 })
             {
                 Application.targetFrameRate = fps; p.Teleport(new Vector3(0, .05f, 0));
                 yield return new WaitForSeconds(.3f);
@@ -71,6 +71,16 @@ namespace PhewaValley
             p.inputEnabled = false;
             p.SetFigure("resident_f", Color.green, 1.6f);
             Check(Mathf.Abs(p.body.height - 1.65f) < .01f && Mathf.Abs(p.body.center.y - .825f) < .01f, "protagonist capsule follows character height");
+            p.enabled = false; p.Teleport(new Vector3(8, .05f, 0));
+            p.SetCrouching(true);
+            var crouchCeiling = Box("Crouch clearance", new Vector3(8, 1.45f, 0), new Vector3(4, .2f, 4));
+            Physics.SyncTransforms();
+            p.SetCrouching(false);
+            Check(p.Crouching && p.body.height < 1.2f, "low ceiling prevents standing out of crouch");
+            Destroy(crouchCeiling); yield return null; Physics.SyncTransforms();
+            p.SetCrouching(false);
+            Check(!p.Crouching && Mathf.Abs(p.body.height - 1.65f) < .01f, "clear headroom restores the standing capsule");
+            p.enabled = true;
             var visibilityRoot = new GameObject("Camera visibility checks"); visibilityRoot.SetActive(false);
             var visibility = visibilityRoot.AddComponent<CameraRig>(); visibility.target = p.transform;
             var setVisible = typeof(CameraRig).GetMethod("SetBodyVisible", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
@@ -92,8 +102,8 @@ namespace PhewaValley
             p.Knock(Vector3.forward * 5);
             Check(!p.Busy, "brief recovery immunity prevents immediate repeated knockdowns");
             p.Teleport(new Vector3(20, .05f, 10));
-            var car = new GameObject("Check car").AddComponent<CarController>(); car.Init(null);
-            car.transform.position = new Vector3(20, .1f, 0); yield return new WaitForSeconds(.3f);
+            var car = new GameObject("Check car").AddComponent<CarController>();
+            car.transform.position = new Vector3(20, .1f, 0); car.Init(null); yield return new WaitForSeconds(.3f);
             Check(car.TryExit(p, out _), "car finds supported clear exit");
             var left = Box("Blocked left door", new Vector3(17.9f, 1, 0), new Vector3(1, 2, 3));
             yield return new WaitForFixedUpdate();
@@ -106,6 +116,25 @@ namespace PhewaValley
             Destroy(left); Destroy(right);
             car.Launch(20); car.Recover(new Vector3(-1000, 0, 0));
             Check(Mathf.Abs(car.speed) < .01f && car.transform.position.x >= -476, "recovery clears velocity inside valley boundaries");
+            float shortestStop = float.MaxValue, longestStop = 0;
+            foreach (int fps in new[] { 15, 60, 144 })
+            {
+                Application.targetFrameRate = fps;
+                car.GetComponent<CharacterController>().enabled = false;
+                car.transform.SetPositionAndRotation(new Vector3(20, .1f, -35), Quaternion.identity);
+                car.GetComponent<CharacterController>().enabled = true;
+                car.autoDrive = true; car.autoThrottle = -1; car.autoSteer = 0;
+                car.Launch(10);
+                float startZ = car.transform.position.z;
+                for (float t = 0; t < 2 && car.speed > .2f; t += Time.deltaTime) yield return null;
+                float distance = car.transform.position.z - startZ;
+                Check(Mathf.Abs(car.speed) < 1 && distance > 3.5f && distance < 5.5f,
+                    $"{fps} fps brakes from 10 m/s in {distance:0.00} m");
+                shortestStop = Mathf.Min(shortestStop, distance); longestStop = Mathf.Max(longestStop, distance);
+                car.autoDrive = false; car.Launch(0);
+            }
+            Check(longestStop - shortestStop < .2f, "braking distance varies by less than 20 cm across frame rates");
+            Application.targetFrameRate = 60;
             var weather = new GameObject("Check weather").AddComponent<DayNight>(); weather.Init();
             Check(weather.GetComponentInChildren<ParticleSystem>() == null, "rain particle effects are removed");
             Check(weather.Rain == 0 && weather.Wetness == 0 && Shader.GetGlobalFloat("_PhewaWet") == 0, "rain and wet-road effects stay disabled");
@@ -116,7 +145,7 @@ namespace PhewaValley
             Check(schedule.on && schedule.until == "20:00" && !DayNight.Schedule(2, 20 * 60).on, "load shedding interval boundaries");
             var progress = JsonUtility.FromJson<Progress>("{\"version\":1,\"hero\":999,\"missions\":null,\"heroPositions\":null,\"graphics\":-10}");
             typeof(Progress).GetMethod("Sanitized", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(progress, null);
-            Check(progress.hero == 2 && progress.graphics == 0 && progress.missions != null && progress.heroPositions != null, "partial saves sanitize indices and missing lists");
+            Check(progress.hero == Protagonists.Roster.Count - 1 && progress.graphics == 0 && progress.missions != null && progress.heroPositions != null, "partial saves sanitize indices and missing lists");
             var data = WorldData.Load();
             var introVisit = new Progress { sessionOnly = true };
             var opening = new Missions(data, introVisit, (text, success) => { });
@@ -172,6 +201,35 @@ namespace PhewaValley
             var shift = new Missions(data, shiftVisit, (text, success) => { }); shift.Accept("cafe");
             shift.Update(151, Vector3.zero, true);
             Check(shiftVisit.Mission("cafe") == null, "expired tea-shop shift resets for retry");
+            if ((data.audio?.music?.Length ?? 0) > 0)
+            {
+                var audioObject = new GameObject("Generated Aurora audio checks");
+                var director = audioObject.AddComponent<AudioDirector>(); director.Init(data);
+                for (float t = 0; t < 20; t += .1f)
+                {
+                    if (director.LoadedScores == data.audio.music.Length && director.LoadedEffects == data.audio.effects.Length &&
+                        director.LoadedAmbience == data.audio.ambience.Length) break;
+                    yield return new WaitForSeconds(.1f);
+                }
+                Check(director.LoadedScores == data.audio.music.Length && director.LoadedAmbience == data.audio.ambience.Length && director.LoadedEffects == data.audio.effects.Length,
+                    "Aurora loads every generated score, ambience loop and effect");
+                var audioClips = new HashSet<AudioClip>();
+                foreach (var source in audioObject.GetComponents<AudioSource>()) if (source.clip) audioClips.Add(source.clip);
+                foreach (var entry in data.audio.effects) { var effect = director.EffectClip(entry.id); if (effect) audioClips.Add(effect); }
+                foreach (var clip in audioClips)
+                {
+                    var samples = new float[clip.samples * clip.channels];
+                    bool valid = clip.GetData(samples, 0); float peak = 0;
+                    foreach (float sample in samples)
+                    {
+                        valid &= !float.IsNaN(sample) && !float.IsInfinity(sample);
+                        peak = Mathf.Max(peak, Mathf.Abs(sample));
+                    }
+                    Check(valid && peak > .001f && peak <= 1.001f && clip.length > .3f,
+                        $"generated audio {clip.name} decodes to finite, audible samples");
+                }
+                Destroy(audioObject); yield return null;
+            }
             yield return CharacterAnimationChecks.Run(transform, Check);
             Debug.Log($"[verify] RESULT passed={passed} failed={failed}");
             System.IO.File.WriteAllLines(System.IO.Path.Combine(Application.dataPath, "..", "controller-checks.txt"), results);

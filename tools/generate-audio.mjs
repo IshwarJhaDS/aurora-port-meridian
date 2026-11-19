@@ -11,10 +11,10 @@ import { AMBIENCE, EFFECTS, MUSIC, VOICE_CAST, voiceKey } from '../src/assets/ca
 import { spokenScript } from './lib/script.mjs';
 import { loadEnv, requireEnv, flags, readManifest, updateManifest, exists, writeBinary, request, pool, OUT } from './lib/common.mjs';
 
-const API = (process.env.ELEVENLABS_BASE_URL || 'https://api.elevenlabs.io').replace(/\/$/, '');
 const opts = flags();
 if (opts.help) { console.log('Usage: node tools/generate-audio.mjs [--only voices,ambience,effects,music,voices:<speaker>] [--force] [--dry-run]'); process.exit(0); }
 await loadEnv();
+const API = (process.env.ELEVENLABS_BASE_URL || 'https://api.elevenlabs.io').replace(/\/$/, '');
 
 const sections = opts.only ? new Set([...opts.only].map(s => s.split(':')[0])) : new Set(['voices', 'ambience', 'effects', 'music']);
 const speakersOnly = opts.only ? new Set([...opts.only].filter(s => s.startsWith('voices:')).map(s => s.slice(7))) : new Set();
@@ -55,7 +55,7 @@ async function run(job) {
     body = { text: job.text, model_id: process.env.ELEVENLABS_TTS_MODEL || 'eleven_multilingual_v2', voice_settings: { stability: .5, similarity_boost: .8, style: .15, use_speaker_boost: true } };
   } else if (job.kind === 'music') {
     url = `${API}/v1/music?output_format=${format}`;
-    body = { prompt: job.text, music_length_ms: job.def.lengthMs, force_instrumental: true, ...(process.env.ELEVENLABS_MUSIC_MODEL ? { model_id: process.env.ELEVENLABS_MUSIC_MODEL } : {}) };
+    body = { prompt: job.text, music_length_ms: job.def.lengthMs, force_instrumental: true, model_id: process.env.ELEVENLABS_MUSIC_MODEL || 'music_v2_5' };
   } else {
     url = `${API}/v1/sound-generation?output_format=${format}`;
     body = { text: job.text, duration_seconds: job.def.duration, loop: Boolean(job.def.loop), prompt_influence: .45, ...(process.env.ELEVENLABS_SFX_MODEL ? { model_id: process.env.ELEVENLABS_SFX_MODEL } : {}) };

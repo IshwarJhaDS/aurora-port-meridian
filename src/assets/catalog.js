@@ -117,22 +117,139 @@ export const CHARACTERS = Object.freeze([
 
 /** ElevenLabs sound effects. Loops crossfade by district, weather and time of day. */
 export const AMBIENCE = Object.freeze([
-  { id: 'bazaar', loop: true, duration: 30, prompt: 'Busy old-town bazaar in Kathmandu: crowd chatter in Nepali, distant motorbike horns, shopkeepers calling, pigeons, an occasional temple bell. Seamless ambience.' },
-  { id: 'temple', loop: true, duration: 30, prompt: 'Hindu-Buddhist temple courtyard in Kathmandu: soft bronze bells ringing now and then, prayer wheels turning, pigeons fluttering, distant low monk chanting, gentle breeze. Seamless ambience.' },
-  { id: 'lake', loop: true, duration: 30, prompt: 'Calm lakeshore at Phewa Lake, Pokhara: gentle water lapping on wooden boats, slow oar strokes, birds over the water, light breeze, faint distant voices. Seamless ambience.' },
-  { id: 'hills', loop: true, duration: 30, prompt: 'Himalayan foothill village on a hillside: wind through pine trees, birdsong, distant cowbells and goats, a rooster far away. Seamless ambience.' },
-  { id: 'night', loop: true, duration: 30, prompt: 'Small Nepali town at night: crickets, distant dogs barking, soft wind, very faint far-off radio music. Seamless ambience.' },
-  { id: 'rain', loop: true, duration: 30, prompt: 'Monsoon rain on corrugated tin roofs and stone streets, steady and immersive, occasional dripping gutters. Seamless ambience.' }
+  {
+    "id": "bazaar",
+    "loop": true,
+    "duration": 20,
+    "prompt": "Fictional coastal city Aurora, lively old-town street, layered indistinct crowd murmur, market stalls, soft distant traffic, pigeons and footsteps. Natural stereo ambience, no intelligible speech, no music, smooth seamless loop."
+  },
+  {
+    "id": "temple",
+    "loop": true,
+    "duration": 20,
+    "prompt": "Quiet weathered courtyard in a mysterious coastal city, gentle wind through hanging cloth, a distant resonant metal wind chime, soft pigeons, subdued faraway city activity. Natural stereo seamless loop, no music or intelligible words."
+  },
+  {
+    "id": "lake",
+    "loop": true,
+    "duration": 20,
+    "prompt": "Coastal harbor at dawn, gentle water against wooden piers, distant seabirds, quiet boat ropes creaking, broad soft sea breeze. Immersive natural stereo loop without music."
+  },
+  {
+    "id": "hills",
+    "loop": true,
+    "duration": 20,
+    "prompt": "Pine forest above a coastal city, soft branches in the breeze, scattered birds and insects, spacious peaceful atmosphere with a faint mysterious distant wind. Seamless natural stereo loop, no music."
+  },
+  {
+    "id": "night",
+    "loop": true,
+    "duration": 20,
+    "prompt": "Aurora city after dark, soft urban hum, cool harbor breeze, occasional distant dog and quiet insects, sparse distant cars, mysterious calm. Natural stereo seamless loop, no music or voices."
+  },
+  {
+    "id": "rain",
+    "loop": true,
+    "duration": 20,
+    "prompt": "Soft steady rainfall on old stone paving and sheet-metal awnings, detailed droplets and gentle runoff, immersive stereo seamless ambience, no thunder or music."
+  }
 ]);
 
 export const EFFECTS = Object.freeze([
-  { id: 'bell', duration: 4, prompt: 'A single bronze Nepali temple bell struck once, bright ring with long shimmering decay.' },
-  { id: 'success', duration: 3, prompt: 'Short cheerful flourish on a Nepali madal drum ending with a small bright bell, success sound.' },
-  { id: 'bus_horn', duration: 3, prompt: 'Musical multi-tone horn of a colourful Nepali bus, playful melody, outdoors.' }
+  {
+    "id": "engine_loop",
+    "duration": 5,
+    "loop": true,
+    "prompt": "Steady warm idle of a compact vintage petrol car engine, low mechanical rumble with subtle cyclical vibration, close clean engine sound, absolutely constant RPM, seamless loop, no acceleration, horns, voices, or music."
+  },
+  {
+    "id": "bell",
+    "duration": 3,
+    "prompt": "One resonant old brass courtyard bell, a clean single strike with a delicate natural decay. Isolated game effect, no background."
+  },
+  {
+    "id": "success",
+    "duration": 3,
+    "prompt": "Original short hopeful game mission-complete sting, warm plucked strings, two bright bell notes and a restrained hand drum accent, elegant cinematic finish."
+  },
+  {
+    "id": "bus_horn",
+    "duration": 2,
+    "prompt": "One short vintage city bus horn, warm mechanical two-tone honk, outdoor distance, no traffic background."
+  },
+  {
+    "id": "step_stone",
+    "duration": 0.5,
+    "prompt": "One isolated shoe footstep on dry stone paving, crisp sole contact and low body weight, dry close Foley, no echo or background."
+  },
+  {
+    "id": "step_road",
+    "duration": 0.5,
+    "prompt": "One isolated sneaker footstep on coarse asphalt, firm low thud with slight gritty scrape, dry close Foley, no background."
+  },
+  {
+    "id": "step_grass",
+    "duration": 0.5,
+    "prompt": "One isolated boot footstep on soft grass and dirt, cushioned crunch of leaves and soil, close dry Foley, no background."
+  },
+  {
+    "id": "land_soft",
+    "duration": 0.7,
+    "prompt": "One grounded human landing from a small jump onto stone, two shoe soles touch with a compact soft thud and brief cloth rustle, dry isolated Foley."
+  },
+  {
+    "id": "land_heavy",
+    "duration": 1,
+    "prompt": "One heavy human landing on stone, deep grounded shoe thump, tiny grit scatter and clothing rustle. Restrained cinematic Foley, isolated, no voice or music."
+  },
+  {
+    "id": "cloth_whoosh",
+    "duration": 0.7,
+    "prompt": "One quick martial arts arm swing with a loose cotton sleeve, compact airy cloth swish, dry close Foley, no impact or voice."
+  },
+  {
+    "id": "blade_swing",
+    "duration": 0.7,
+    "prompt": "One fast sword swing through air, tight metallic airy swish, brief convincing sharp movement, isolated Foley, no impact, voice or background."
+  },
+  {
+    "id": "bow_release",
+    "duration": 0.7,
+    "prompt": "One traditional wooden bow firing, taut string snaps forward and a quick arrow flight swish, dry close isolated game sound, no impact or voice."
+  },
+  {
+    "id": "vehicle_impact",
+    "duration": 1.4,
+    "prompt": "One compact car bumping a stone barrier at moderate speed, short metal and bumper thud with a small rattle, believable restrained impact, no explosion or voices."
+  },
+  {
+    "id": "ui_confirm",
+    "duration": 0.6,
+    "prompt": "One soft elegant game interface confirmation, a warm wooden click with a tiny bright glass chime, understated clean short single sound."
+  }
 ]);
 
 export const MUSIC = Object.freeze([
-  { id: 'theme', lengthMs: 90000, prompt: 'Warm, gentle Nepali folk instrumental: sarangi melody, bansuri bamboo flute, soft madal drum groove, light acoustic guitar. Calm, hopeful, morning in the Himalayan valley. No vocals.' }
+  {
+    "id": "theme",
+    "lengthMs": 60000,
+    "prompt": "Original instrumental score for Aurora, a mysterious lively fictional coastal city and martial arts adventure. Warm analog synth atmosphere, expressive plucked strings, upright bass, brushed percussion and a delicate bell motif. 88 BPM. Curious, hopeful, cinematic and spacious. Strong memorable original motif, no vocals, no imitation of existing songs. Smooth recurring structure suitable for unobtrusive exploration."
+  },
+  {
+    "id": "night",
+    "lengthMs": 60000,
+    "prompt": "Original instrumental nighttime game score for Aurora. Cool harbor air and neon reflected on stone streets, intimate electric piano, soft analog pads, low cello, sparse bamboo flute phrases and restrained brushed drums. 72 BPM, mysterious but comforting, gently suspenseful, no vocals. Spacious repeating arrangement with soft ending."
+  },
+  {
+    "id": "exploration",
+    "lengthMs": 60000,
+    "prompt": "Original instrumental exploration game score, hill paths and a vast harbor above the fictional city Aurora. Warm plucked strings and acoustic guitar, spacious soft synth textures, breathy flute and sparse hand percussion. 82 BPM, wonder and discovery, quietly adventurous, no vocals, no dramatic finale, unobtrusive recurring motif."
+  },
+  {
+    "id": "tension",
+    "lengthMs": 45000,
+    "prompt": "Original instrumental martial arts pursuit game score for Aurora, nimble hand drums and woodblocks, staccato low strings, driving bass pulse and short plucked string accents. 120 BPM. Energetic, playful determination with cinematic suspense, clear rhythmic movement, no vocals, no melodies from existing films, repeating arrangement with restrained ending."
+  }
 ]);
 
 /**

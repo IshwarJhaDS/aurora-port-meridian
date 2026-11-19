@@ -18,6 +18,7 @@ namespace PhewaValley
         public (Interaction kind, string label, string target) interaction;
         public Vector3? navTarget; public string navLabel, navId;
         public (string action, float time, float duration)? work; public (string target, float time, float duration)? hold;
+        public DhaneActions dhaneActions;
         public FirstVisitGuide guide; Vector3 lastGuidePosition; bool lastGuideInCar;
         float saveTimer;
 
@@ -29,6 +30,7 @@ namespace PhewaValley
         {
             var args = System.Environment.GetCommandLineArgs();
             if (System.Array.IndexOf(args, "-phewa-verify") >= 0) { new GameObject("Controller checks").AddComponent<ControllerChecks>(); return; }
+            if (System.Array.IndexOf(args, "-aurora-physics-lab") >= 0) { new GameObject("Aurora physics lab").AddComponent<PhysicsLab>(); return; }
             int preview = System.Array.IndexOf(args, "-phewa-preview");
             if (preview >= 0 && preview + 2 < args.Length) { var p = new GameObject("Model Preview").AddComponent<ModelPreview>(); p.input = args[preview + 1]; p.output = args[preview + 2]; return; }
             int clips = System.Array.IndexOf(args, "-phewa-clips");
@@ -77,6 +79,7 @@ namespace PhewaValley
             activities = new GameObject("Pastimes").AddComponent<Activities>(); activities.transform.SetParent(transform, false); activities.Init();
             streetLife = new GameObject("Street Life").AddComponent<StreetLife>(); streetLife.transform.SetParent(transform, false);
             heroes = new GameObject("Protagonists").AddComponent<Protagonists>(); heroes.transform.SetParent(transform, false); heroes.Init();
+            dhaneActions = gameObject.AddComponent<DhaneActions>();
             events = new GameObject("Street Events").AddComponent<StreetEvents>(); events.transform.SetParent(transform, false);
             radio = new GameObject("Car Radio").AddComponent<CarRadio>(); radio.transform.SetParent(transform, false);
             job = new GameObject("Passenger Job").AddComponent<PassengerJob>(); job.transform.SetParent(transform, false);
@@ -107,7 +110,18 @@ namespace PhewaValley
             rig.yaw = 225; rig.pitch = 8; rig.distance = 9;
             if (Arg("-phewa-at", 3) != null) { var at = new Vector3(F(Arg("-phewa-at")), 0, F(Arg("-phewa-at", 2))); at.y = World.TerrainHeight(at.x, at.z) + .1f; player.body.enabled = false; player.transform.position = at; player.transform.rotation = Quaternion.Euler(0, F(Arg("-phewa-at", 3)), 0); player.body.enabled = true; rig.yaw = F(Arg("-phewa-at", 3)); streamer.Prime(at); }
             yield return new WaitForSeconds(1);
-            if (Arg("-phewa-switch") != null) { heroes.Switch(int.Parse(Arg("-phewa-switch"))); yield return new WaitForSeconds(3.2f); }
+            if (Arg("-phewa-switch") != null)
+            {
+                int requested = int.Parse(Arg("-phewa-switch"));
+                heroes.Switch(requested);
+                yield return new WaitForSeconds(3.2f);
+                if (progress.hero != requested || heroes.Switching || !models.Has(heroes.Current.model))
+                {
+                    Debug.LogError($"[smoke] Character switch failed for roster index {requested}");
+                    Application.Quit(1); yield break;
+                }
+                Debug.Log($"[smoke] Switched to {heroes.Current.name}");
+            }
             if (Arg("-phewa-drive") != null) { car.Recover(player.transform.position); car.transform.position = player.transform.position + player.transform.right * 2.5f; interaction = (Interaction.EnterCar, "", null); Interact(); rig.yaw = car.transform.eulerAngles.y; car.Launch(F(Arg("-phewa-speed") ?? "9")); radio.ShowUntil = Time.time + 30; if (Arg("-phewa-drive") == "shift") job.Toggle(this); yield return new WaitForSeconds(1.5f); }
             var play = Arg("-phewa-play"); if (play != null) { var a = activities.all.Find(x => x.id == play); if (a != null) { activities.Play(a); for (int i = 0; i < 40; i++) { a.Tick(.05f); } } }
             if (Arg("-phewa-nohud") != null) ui.enabled = false;
@@ -145,6 +159,8 @@ namespace PhewaValley
             if (Arg("-phewa-render-camera") != null) CaptureCamera(file);
             else ScreenCapture.CaptureScreenshot(file);
             yield return new WaitForSeconds(1.5f);
+            if ((data.audio?.music?.Length ?? 0) > 0)
+                Debug.Log($"[smoke] audio ambience={audioDirector.LoadedAmbience}/{data.audio.ambience.Length} scores={audioDirector.LoadedScores}/{data.audio.music.Length} effects={audioDirector.LoadedEffects}/{data.audio.effects.Length}");
             Debug.Log($"[smoke] player speed={player.Speed:0.00} airborne={player.figure.Airborne} grounded={player.body.isGrounded} y={player.transform.position.y:0.00}");
             Debug.Log($"[smoke] ok chunks={streamer.Resident} citizens={citizens.agents.Count} models={models.Loaded.Count()} fps={avg:0} (4 s average)");
             Application.Quit();
@@ -181,7 +197,7 @@ namespace PhewaValley
             var floor = new GameObject("Safety floor"); floor.transform.SetParent(transform, false); floor.transform.position = new Vector3(-22, -.6f, 40); floor.AddComponent<BoxCollider>().size = new Vector3(920, 1, 1100);
         }
 
-        public void Begin() { if (!Ready) return; Started = true; Notify("Swagatam! Welcome to Phewa Valley. Maya didi is waiting in Durbar Square.", false); }
+        public void Begin() { if (!Ready) return; Started = true; audioDirector?.Effect("ui_confirm", .4f); Notify("Swagatam! Welcome to Phewa Valley. Maya didi is waiting in Durbar Square.", false); }
 
         public void Notify(string text, bool success) { ui.Toast(text, success); if (success) audioDirector?.Effect("success"); }
 
@@ -192,7 +208,7 @@ namespace PhewaValley
         {
             if (!Ready) return;
             float dt = Time.deltaTime; var p = player.transform.position;
-            player.inputEnabled = !smokeTest && !Paused &&!InDialogue && !ui.ShowWork && work == null && !(activities.Current?.Freeze ?? false) && !(heroes != null && heroes.Switching);
+            player.inputEnabled = !smokeTest && !Paused && !ui.PhotoActive && !(dhaneActions && dhaneActions.Open) && !InDialogue && !ui.ShowWork && work == null && !(activities.Current?.Freeze ?? false) && !(heroes != null && heroes.Switching);
             if (!Paused)
             {
                 bool driving = player.InCar;
@@ -234,6 +250,7 @@ namespace PhewaValley
 
         void HandleKeys()
         {
+            if (dhaneActions && dhaneActions.Open || ui.PhotoActive || ui.ShowWork || work.HasValue || heroes.Switching || activities.Current != null) return;
             if (Input.GetKeyDown(KeyCode.E) && !InDialogue && activities.Current == null) Interact();
             player.figure.Talking = InDialogue;
             // In conversation: turn to face the person and look them in the eye.
@@ -308,7 +325,7 @@ namespace PhewaValley
 
         public void Interact()
         {
-            if (!Ready || Paused || InDialogue || player.Busy || heroes.Switching) return;
+            if (!Ready || Paused || InDialogue || player.Busy || heroes.Switching || dhaneActions && dhaneActions.Open) return;
             var (kind, _, target) = interaction;
             switch (kind)
             {

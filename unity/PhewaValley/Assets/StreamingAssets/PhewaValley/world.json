@@ -1130,9 +1130,108 @@
     }
   ],
   "audio": {
-    "ambience": [],
-    "effects": [],
-    "music": [],
+    "ambience": [
+      {
+        "id": "bazaar",
+        "file": "ambience/bazaar.mp3"
+      },
+      {
+        "id": "temple",
+        "file": "ambience/temple.mp3"
+      },
+      {
+        "id": "lake",
+        "file": "ambience/lake.mp3"
+      },
+      {
+        "id": "hills",
+        "file": "ambience/hills.mp3"
+      },
+      {
+        "id": "night",
+        "file": "ambience/night.mp3"
+      },
+      {
+        "id": "rain",
+        "file": "ambience/rain.mp3"
+      }
+    ],
+    "effects": [
+      {
+        "id": "engine_loop",
+        "file": "effects/engine_loop.mp3"
+      },
+      {
+        "id": "bell",
+        "file": "effects/bell.mp3"
+      },
+      {
+        "id": "success",
+        "file": "effects/success.mp3"
+      },
+      {
+        "id": "bus_horn",
+        "file": "effects/bus_horn.mp3"
+      },
+      {
+        "id": "step_stone",
+        "file": "effects/step_stone.mp3"
+      },
+      {
+        "id": "step_road",
+        "file": "effects/step_road.mp3"
+      },
+      {
+        "id": "step_grass",
+        "file": "effects/step_grass.mp3"
+      },
+      {
+        "id": "land_soft",
+        "file": "effects/land_soft.mp3"
+      },
+      {
+        "id": "land_heavy",
+        "file": "effects/land_heavy.mp3"
+      },
+      {
+        "id": "cloth_whoosh",
+        "file": "effects/cloth_whoosh.mp3"
+      },
+      {
+        "id": "blade_swing",
+        "file": "effects/blade_swing.mp3"
+      },
+      {
+        "id": "bow_release",
+        "file": "effects/bow_release.mp3"
+      },
+      {
+        "id": "vehicle_impact",
+        "file": "effects/vehicle_impact.mp3"
+      },
+      {
+        "id": "ui_confirm",
+        "file": "effects/ui_confirm.mp3"
+      }
+    ],
+    "music": [
+      {
+        "id": "theme",
+        "file": "music/theme.mp3"
+      },
+      {
+        "id": "night",
+        "file": "music/night.mp3"
+      },
+      {
+        "id": "exploration",
+        "file": "music/exploration.mp3"
+      },
+      {
+        "id": "tension",
+        "file": "music/tension.mp3"
+      }
+    ],
     "voices": []
   }
 }

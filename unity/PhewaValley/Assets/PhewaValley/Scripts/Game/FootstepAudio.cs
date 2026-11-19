@@ -4,7 +4,7 @@ namespace PhewaValley
 {
     public enum GroundSound { Stone, Road, Grass }
 
-    /// <summary>Small locally synthesized foley; no downloads or generated-asset dependency.</summary>
+    /// <summary>Generated surface foley with a local synthesized fallback for missing assets.</summary>
     public class FootstepAudio : MonoBehaviour
     {
         AudioSource source; readonly AudioClip[] steps = new AudioClip[3]; AudioClip landing;
@@ -46,12 +46,17 @@ namespace PhewaValley
             distance %= spacing;
             if (!Audible) return;
             source.pitch = (++step % 2 == 0 ? 1.04f : .96f);
-            source.PlayOneShot(steps[(int)SurfaceAt(transform.position)], Mathf.Lerp(.17f, .3f, Mathf.InverseLerp(1, 6, speed)));
+            var surface = SurfaceAt(transform.position);
+            string id = surface == GroundSound.Grass ? "step_grass" : surface == GroundSound.Road ? "step_road" : "step_stone";
+            var generated = Game.Instance ? Game.Instance.audioDirector?.EffectClip(id) : null;
+            source.PlayOneShot(generated ? generated : steps[(int)surface], Mathf.Lerp(.17f, .3f, Mathf.InverseLerp(1, 6, speed)));
         }
         public void Land(float impact)
         {
             distance = 0; if (!Audible || impact < 3) return;
-            source.pitch = 1; source.PlayOneShot(landing, Mathf.Lerp(.18f, .45f, Mathf.InverseLerp(3, 14, impact)));
+            source.pitch = 1;
+            var generated = Game.Instance ? Game.Instance.audioDirector?.EffectClip(impact > 9 ? "land_heavy" : "land_soft") : null;
+            source.PlayOneShot(generated ? generated : landing, Mathf.Lerp(.18f, .45f, Mathf.InverseLerp(3, 14, impact)));
         }
         public void ResetStride() { distance = 0; }
         void OnDestroy() { foreach (var clip in steps) if (clip) Destroy(clip); if (landing) Destroy(landing); }

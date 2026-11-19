@@ -223,13 +223,13 @@ namespace PhewaValley
         {
             var G = Game.Instance; if (G == null || !G.Ready) return;
             bool inCar = G.player.InCar && G.Started;
-            if (inCar && Input.GetKeyDown(KeyCode.Q) && G.activities.Current == null) { station = (station + 1) % Stations.Length; ShowUntil = Time.time + 4; tickerIndex = 0; tickerTimer = 0; }
+            if (inCar && !G.Paused && !G.ui.PhotoActive && Input.GetKeyDown(KeyCode.Q) && G.activities.Current == null) { station = (station + 1) % Stations.Length; ShowUntil = Time.time + 4; tickerIndex = 0; tickerTimer = 0; }
             if (inCar && !wasInCar) ShowUntil = Time.time + 4; wasInCar = inCar;
             tickerTimer += Time.deltaTime; if (tickerTimer > 7) { tickerTimer = 0; tickerIndex++; }
             var music = G.audioDirector.MusicClip; var want = station == 3 ? null : station == 2 || music == null ? staticClip : music;
-            if (src.clip != want) { src.clip = want; if (want) { src.time = want == music ? Random.Range(0, want.length * .6f) : 0; src.Play(); } }
+            if (src.clip != want && src.volume <= .005f) { src.clip = want; if (want) { src.time = want == music ? Random.Range(0, want.length * .6f) : 0; src.Play(); } }
             src.pitch = Stations[station].pitch;
-            float target = inCar && want != null && G.progress.ambience ? (want == staticClip ? .05f : .55f) : 0;
+            float target = inCar && src.clip == want && want != null && G.progress.ambience ? (want == staticClip ? .05f : .55f) : 0;
             src.volume = Mathf.MoveTowards(src.volume, target, Time.deltaTime * .8f);
         }
         bool wasInCar;
@@ -244,7 +244,7 @@ namespace PhewaValley
         void Update()
         {
             var G = Game.Instance; if (G == null || !G.Ready || !G.Started || G.Paused) return;
-            if (G.player.InCar && Input.GetKeyDown(KeyCode.T) && G.activities.Current == null) Toggle(G);
+            if (G.player.InCar && !G.ui.PhotoActive && Input.GetKeyDown(KeyCode.T) && G.activities.Current == null) Toggle(G);
             if (!OnDuty) return;
             if (!G.player.InCar) { Status = "Get back in your vehicle to continue the shift."; return; }
             var car = G.car.transform.position; bool slow = Mathf.Abs(G.car.speed) < 3;

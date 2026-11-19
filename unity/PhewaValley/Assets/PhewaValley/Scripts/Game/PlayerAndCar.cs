@@ -12,6 +12,12 @@ namespace PhewaValley
     ///  · a vehicle whizzing past makes you flinch, running into people staggers you, long falls land hard;
     ///  · steps and steep slopes switch to the stair run.
     /// </summary>
+    static class PhysicsTiming
+    {
+        public const float Step = 1f / 120f;
+        public const float MaxFrame = .25f;
+    }
+
     public class PlayerController : MonoBehaviour
     {
         public CharacterController body; public Figure figure; public bool inputEnabled = true; public CarController car;
@@ -25,7 +31,12 @@ namespace PhewaValley
         enum State { Normal, Climb, Dive, Knocked }
         State state; float stateTime, stateLength, fallSpeed, flinchCooldown, bumpCooldown, lastY;
         Vector3 planar, climbFrom, climbTo, push;
-        float coyote, jumpBuffer;
+        float coyote, jumpBuffer, simulationTime;
+        Vector2 movementInput;
+        float requestedSpeed, standingHeight;
+        bool crouchRequested;
+        public bool Crouching { get; private set; }
+        bool jumpPressed, divePressed, jumpReleased;
         bool groundedBeforeMove; float knockImmunity;
         readonly RaycastHit[] groundHits = new RaycastHit[24];
         const float Gravity = 15, JumpSpeed = 5.2f;
@@ -35,17 +46,18 @@ namespace PhewaValley
         public void Teleport(Vector3 position)
         {
             body.enabled = false; transform.position = position; body.enabled = true;
-            vertical = fallSpeed = airTimer = coyote = jumpBuffer = gravityDelta = 0;
+            vertical = fallSpeed = airTimer = coyote = jumpBuffer = gravityDelta = simulationTime = 0;
+            jumpPressed = divePressed = jumpReleased = false;
             planar = push = Vector3.zero; Speed = 0; state = State.Normal;
             knockImmunity = .6f;
             jumpNow = diveNow = false; lastFlags = CollisionFlags.None; lastY = position.y;
             figure.ResetPose(); footsteps?.ResetStride();
         }
 
-        public bool CanStand(Vector3 feet)
+        public bool CanStand(Vector3 feet, float? height = null)
         {
             foreach (var c in Physics.OverlapCapsule(feet + Vector3.up * (body.radius + .04f),
-                feet + Vector3.up * (body.height - body.radius), body.radius - .02f,
+                feet + Vector3.up * ((height ?? body.height) - body.radius), body.radius - .02f,
                 Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
                 if (!c.transform.IsChildOf(transform)) return false;
             return true;
@@ -64,7 +76,8 @@ namespace PhewaValley
         public void SetFigure(string model, Color outfit, float height)
         {
             if (figure) { figure.gameObject.SetActive(false); Destroy(figure.gameObject); }
-            body.height = Mathf.Max(1.2f, height + .05f); body.center = Vector3.up * (body.height * .5f);
+            standingHeight = Mathf.Max(1.2f, height + .05f); Crouching = false;
+            body.height = standingHeight; body.center = Vector3.up * (body.height * .5f);
             body.radius = Mathf.Min(.32f, height * .185f); body.stepOffset = Mathf.Min(.32f, body.height * .2f);
             figure = Figure.Create(transform, model, outfit, new Color(.55f, .35f, .22f), new Color(.02f, .02f, .02f), null, models, height);
         }
@@ -73,8 +86,34 @@ namespace PhewaValley
 
         void Update()
         {
+            var G = Game.Instance;
+            if (G && (!G.Ready || G.Paused || G.heroes != null && G.heroes.Switching))
+            {
+                simulationTime = 0;
+                jumpPressed = divePressed = jumpReleased = false;
+                return;
+            }
+            crouchRequested = inputEnabled && Input.GetKey(KeyCode.C);
+            movementInput = inputEnabled ? new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical")) : Vector2.zero;
+            requestedSpeed = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift) ? 5.8f : Input.GetKey(KeyCode.C) ? 1.2f : 1.8f;
+            // Preserve button edges when rendering runs faster than simulation.
+            jumpPressed |= inputEnabled && Input.GetKeyDown(KeyCode.Space) || jumpNow;
+            divePressed |= inputEnabled && (Input.GetKeyDown(KeyCode.LeftControl) || Input.GetKeyDown(KeyCode.RightControl)) || diveNow;
+            jumpReleased |= inputEnabled && Input.GetKeyUp(KeyCode.Space);
+            jumpNow = diveNow = false;
+            simulationTime += Mathf.Min(Time.deltaTime, PhysicsTiming.MaxFrame);
+            while (simulationTime >= PhysicsTiming.Step)
+            {
+                simulationTime -= PhysicsTiming.Step;
+                Simulate(PhysicsTiming.Step);
+                jumpPressed = divePressed = jumpReleased = false;
+            }
+        }
+
+        void Simulate(float dt)
+        {
             if (InCar) { Speed = 0; planar = Vector3.zero; state = State.Normal; return; }
-            float dt = Time.deltaTime; if (dt <= 0 || !body.enabled && state != State.Climb) return;
+            if (!body.enabled && state != State.Climb) return;
             var G = Game.Instance; var cam = Camera.main ? Camera.main.transform : transform;
             if (G && (!G.Ready || G.Paused || G.heroes != null && G.heroes.Switching)) return;
             groundedBeforeMove = body.enabled && body.isGrounded && vertical <= 0;
@@ -97,7 +136,11 @@ namespace PhewaValley
             if (grounded)
             {
                 if (!groundedBeforeMove) footsteps?.Land(-fallSpeed);
-                if (!groundedBeforeMove && fallSpeed < -11 && state == State.Normal) HardLanding();
+                if (!groundedBeforeMove && state == State.Normal)
+                {
+                    if (fallSpeed < -11) HardLanding();
+                    else if (fallSpeed < -3) figure.PlayClip("land_soft", Act.PinXZ | Act.WhileMoving);
+                }
                 fallSpeed = 0; if (vertical < 0) vertical = -1;
             }
             else fallSpeed = Mathf.Min(fallSpeed, vertical);
@@ -124,6 +167,8 @@ namespace PhewaValley
         void Move(float dt)
         {
             var before = transform.position;
+            // Step assistance is for walking. Airborne capsules must collide with ledges.
+            body.stepOffset = groundedBeforeMove && vertical <= 0 ? Mathf.Min(.32f, body.height * .2f) : 0;
             lastFlags = body.Move((planar + Vector3.up * (vertical + gravityDelta * .5f)) * dt);
             // Keep contact on small descending steps; never snap an upward jump or a real fall.
             if (state == State.Normal && vertical <= 0 && !body.isGrounded && (groundedBeforeMove || coyote > 0))
@@ -133,7 +178,7 @@ namespace PhewaValley
                 float nearest = float.MaxValue;
                 for (int i = 0; i < count; i++)
                     if (!groundHits[i].transform.IsChildOf(transform) && groundHits[i].normal.y >= Mathf.Cos(body.slopeLimit * Mathf.Deg2Rad)) nearest = Mathf.Min(nearest, groundHits[i].distance);
-                if (nearest < float.MaxValue) lastFlags |= body.Move(Vector3.down * (nearest + body.skinWidth));
+                if (nearest < float.MaxValue) lastFlags |= body.Move(Vector3.down * Mathf.Max(0, nearest - .1f + body.skinWidth));
             }
             var actual = Vector3.ProjectOnPlane(transform.position - before, Vector3.up) / dt;
             // Animate the distance actually travelled, so pushing a wall does not run in place.
@@ -142,15 +187,24 @@ namespace PhewaValley
             footsteps?.Travel(actual.magnitude * dt, Speed, body.isGrounded && vertical <= 0 && state == State.Normal);
         }
 
+        internal void SetCrouching(bool requested)
+        {
+            Crouching = requested || Crouching && !CanStand(transform.position, standingHeight);
+            body.height = Crouching ? standingHeight * .65f : standingHeight;
+            body.center = Vector3.up * (body.height * .5f);
+            figure.Crouching = Crouching;
+        }
+
         void UpdateNormal(float dt, Transform cam)
         {
-            Vector2 input = inputEnabled ? new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical")) : Vector2.zero;
+            SetCrouching(crouchRequested);
+            Vector2 input = inputEnabled ? movementInput : Vector2.zero;
             var forward = Vector3.ProjectOnPlane(cam.forward, Vector3.up).normalized;
             if (forward.sqrMagnitude < .01f) forward = transform.forward; var right = Vector3.Cross(Vector3.up, forward);
             var move = Vector3.ClampMagnitude(forward * input.y + right * input.x, 1);
             // Walk by default, Shift to run, C to stroll. Speeds sit inside the walk/run clips' natural
             // range (Tripo walk ~1.2 m/s, run ~4.2 m/s) so the feet match the ground.
-            float speed = (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) ? 5.8f : Input.GetKey(KeyCode.C) ? 1.2f : 1.8f;
+            float speed = Crouching ? 1.2f : requestedSpeed;
             if (autoMove > 0) { move = transform.forward; speed = autoMove; } // smoke tests only
             if (figure.Busy && !figure.Airborne) move *= .3f; // staggering or flinching: you cannot just walk on
             // Momentum: a body takes time to get going and to stop; running turns are wider.
@@ -159,18 +213,19 @@ namespace PhewaValley
             planar = !inputEnabled && autoMove <= 0 ? Vector3.zero : Vector3.MoveTowards(planar, want, rate * dt);
             Speed = planar.magnitude;
             if (move.sqrMagnitude > .01f) transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(move), 1 - Mathf.Exp(-dt * Mathf.Lerp(16, 9, Mathf.Clamp01((Speed - 2) / 4))));
-            bool jumpKey = inputEnabled && Input.GetKeyDown(KeyCode.Space) || jumpNow; jumpNow = false;
-            bool diveKey = inputEnabled && (Input.GetKeyDown(KeyCode.LeftControl) || Input.GetKeyDown(KeyCode.RightControl)) || diveNow; diveNow = false;
+            bool jumpKey = jumpPressed; jumpPressed = false;
+            bool diveKey = divePressed; divePressed = false;
             jumpBuffer = jumpKey ? .12f : Mathf.Max(0, jumpBuffer - dt);
             if (!inputEnabled && !jumpKey) jumpBuffer = 0;
-            if (coyote > 0 && jumpBuffer > 0)
+            if (!Crouching && coyote > 0 && jumpBuffer > 0)
             {
                 jumpBuffer = coyote = 0;
                 if (groundedBeforeMove && FindLedge(out var top)) { StartClimb(top); return; }
                 vertical = JumpSpeed - Gravity * dt; gravityDelta = Gravity * dt; figure.Jump(2 * JumpSpeed / Gravity);
             }
             // Releasing Space early makes a short hop; holding it keeps the full arc.
-            if (inputEnabled && vertical > 0 && Input.GetKeyUp(KeyCode.Space)) vertical *= .55f;
+            if (vertical > 0 && jumpReleased) vertical *= .55f;
+            jumpReleased = false;
             if (groundedBeforeMove && vertical <= 0 && diveKey && (Speed > 1.5f || autoMove > 0)) StartDive();
             Move(dt);
         }
@@ -201,7 +256,10 @@ namespace PhewaValley
             state = State.Climb; stateTime = 0; stateLength = Mathf.Lerp(.55f, 1.05f, Mathf.InverseLerp(.45f, 2.2f, h));
             climbFrom = transform.position; climbTo = top; body.enabled = false; planar = Vector3.zero; Speed = 0;
             // The climb clip's spring and knee tuck, timed to the climb; its own lift and travel are removed.
-            figure.Action("climb", 1.3f, 2.25f, .95f / stateLength, Act.PinXZ | Act.CancelLift | Act.WhileMoving);
+            var flags = Act.PinXZ | Act.CancelLift | Act.WhileMoving;
+            string climbClip = h < 1.2f && figure.HasClip("low_vault") ? "low_vault" : "ledge_climb";
+            if (figure.HasClip(climbClip)) figure.PlayClip(climbClip, flags, figure.ClipDuration(climbClip) / stateLength);
+            else figure.Action("climb", 1.3f, 2.25f, .95f / stateLength, flags);
         }
 
         void UpdateClimb(float dt)
@@ -224,6 +282,7 @@ namespace PhewaValley
             state = State.Dive; stateTime = 0; stateLength = 2.0f;
             var dir = planar.sqrMagnitude > .1f ? planar.normalized : transform.forward; transform.rotation = Quaternion.LookRotation(dir);
             push = dir * Mathf.Max(6.2f, planar.magnitude + 1.5f);
+            Game.Instance?.audioDirector?.Effect("cloth_whoosh", .35f);
             figure.Action("dive", .25f, 2.71f, 1.25f, Act.PinXZ | Act.WhileMoving | Act.NoPlant);
         }
 
@@ -247,9 +306,19 @@ namespace PhewaValley
             state = State.Knocked; stateTime = 0; stateLength = (2.6f - .3f) / 1.4f + (2.71f - 1.75f) / .9f;
             var away = hitVelocity; away.y = 0; push = away.normalized * Mathf.Clamp(hitVelocity.magnitude * .6f, 3, 8); vertical = 2.5f;
             if (away.sqrMagnitude > .01f) transform.rotation = Quaternion.LookRotation(-away.normalized);
+            if (figure.HasClip("knockdown_back") && figure.HasClip("get_up_back"))
+            {
+                var flags = Act.PinXZ | Act.WhileMoving | Act.NoPlant;
+                stateLength = (figure.ClipDuration("knockdown_back") + figure.ClipDuration("get_up_back")) / 1.2f;
+                figure.PlayClip("knockdown_back", flags, 1.2f);
+                figure.QueueClip("get_up_back", flags, 1.2f);
+            }
+            else
+            {
             figure.Action("fall", .3f, 2.6f, 1.4f, Act.PinXZ | Act.WhileMoving | Act.NoPlant);
             figure.Then("dive", 1.75f, 2.71f, .9f, Act.PinXZ | Act.WhileMoving | Act.NoPlant);       // the end of the roll: getting back up
             figure.Then("complain_02", .4f, 3.2f, 1.1f, Act.None);                                  // shaking a fist at the driver
+            }
             Game.Instance?.Notify("Oi! Herera chalau, dai! (Watch where you drive!)", false);
         }
 
@@ -263,7 +332,9 @@ namespace PhewaValley
         void HardLanding()
         {
             if (fallSpeed < -16) { Knock(transform.forward * 2); return; }               // a real fall: down you go
-            planar *= .2f; figure.Action("hit_to_body_02", .5f, 1.5f, 1.6f, Act.WhileMoving | Act.PinXZ); // knees buckle
+            planar *= .2f;
+            if (figure.PlayClip("land_heavy", Act.PinXZ | Act.WhileMoving)) return;
+            figure.Action("hit_to_body_02", .5f, 1.5f, 1.6f, Act.WhileMoving | Act.PinXZ); // knees buckle
         }
     }
 
@@ -333,17 +404,31 @@ namespace PhewaValley
         void SetWheels(float x, float z) { wheelLocal[0] = new Vector3(-x, 0, z); wheelLocal[1] = new Vector3(x, 0, z); wheelLocal[2] = new Vector3(-x, 0, -z); wheelLocal[3] = new Vector3(x, 0, -z); }
 
         /// <summary>Sets the car moving forward (used by tests and scripted starts).</summary>
-        public void Launch(float forwardSpeed) { velocity = transform.forward * forwardSpeed; speed = forwardSpeed; lastForward = forwardSpeed; }
+        float simulationTime;
+
+        public void Launch(float forwardSpeed) { simulationTime = 0; velocity = transform.forward * forwardSpeed; speed = forwardSpeed; lastForward = forwardSpeed; }
 
         bool Ignore(Collider c) => c.transform.IsChildOf(transform) || driver != null && c.transform.IsChildOf(driver.transform) || c.isTrigger;
 
         void Update()
         {
-            float dt = Mathf.Min(Time.deltaTime, .05f); if (dt <= 0) return;
-            if (Game.Instance && (!Game.Instance.Ready || Game.Instance.Paused)) return;
+            float elapsed = Mathf.Min(Time.deltaTime, PhysicsTiming.MaxFrame); if (elapsed <= 0) return;
+            if (Game.Instance && (!Game.Instance.Ready || Game.Instance.Paused)) { simulationTime = 0; return; }
             float throttle = 0, steer = 0; bool handbrake = false, brake = false;
             if (driver != null && driver.inputEnabled) { throttle = Input.GetAxisRaw("Vertical"); steer = Input.GetAxisRaw("Horizontal"); handbrake = Input.GetKey(KeyCode.Space); brake = Input.GetKey(KeyCode.B); }
             if (autoDrive) { throttle = autoThrottle; steer = autoSteer; } // smoke tests only
+            // Consume the frame in small steps so acceleration, steering and collision
+            // probes retain their scale when rendering stalls.
+            simulationTime += elapsed;
+            while (simulationTime >= PhysicsTiming.Step)
+            {
+                simulationTime -= PhysicsTiming.Step;
+                Simulate(PhysicsTiming.Step, throttle, steer, handbrake, brake);
+            }
+        }
+
+        void Simulate(float dt, float throttle, float steer, bool handbrake, bool brake)
+        {
             float wet = Game.Instance && Game.Instance.dayNight ? Game.Instance.dayNight.Wetness : 0, grip = 1 - wet * .4f;
 
             // Steering: a bicycle model. Full lock at walking pace, only a few degrees at speed.
@@ -381,7 +466,8 @@ namespace PhewaValley
             velocity = fwd * f + right * l; speed = f; Slip = Mathf.Abs(l);
 
             // The capsule is shorter than the car: look ahead from the bumper so the nose does not sink into walls.
-            var travel = velocity * dt; float reach = halfLength - body.radius + travel.magnitude;
+            var travel = velocity * dt; float alignment = travel.sqrMagnitude > 1e-6f ? Mathf.Abs(Vector3.Dot(travel.normalized, fwd)) : 0;
+            float reach = Mathf.Lerp(0, halfLength - body.radius, alignment) + travel.magnitude;
             if (travel.sqrMagnitude > 1e-6f)
             {
                 int n = Physics.SphereCastNonAlloc(transform.position + Vector3.up * .8f, .55f, travel.normalized, hits, reach, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
@@ -390,6 +476,8 @@ namespace PhewaValley
             if (body.isGrounded) vertical = -1; vertical -= 15 * dt;
             var flags = body.Move(travel + Vector3.up * vertical * dt);
             if ((flags & CollisionFlags.Sides) != 0) Impact();
+            if ((flags & CollisionFlags.Above) != 0 && vertical > 0) vertical = 0;
+            speed = Vector3.Dot(velocity, transform.forward);
             Shake = Mathf.MoveTowards(Shake, 0, dt * 2.5f);
             Braking = brake || handbrake || throttle < 0 && f > .5f;
             if (driver != null) { driver.transform.position = transform.position; driver.transform.rotation = transform.rotation; }
@@ -398,7 +486,7 @@ namespace PhewaValley
         void Impact()
         {
             float f = Vector3.Dot(velocity, transform.forward);
-            if (Mathf.Abs(f) > 3) { Shake = Mathf.Clamp01(Mathf.Abs(f) / 14); pitchVel += -Mathf.Sign(f) * Mathf.Abs(f) * 6; velocity = -velocity * .22f; }
+            if (Mathf.Abs(f) > 3) { Game.Instance?.audioDirector?.Effect("vehicle_impact", Mathf.Clamp01(Mathf.Abs(f) / 18)); Shake = Mathf.Clamp01(Mathf.Abs(f) / 14); pitchVel += -Mathf.Sign(f) * Mathf.Abs(f) * 6; velocity = -velocity * .22f; }
             else velocity *= .3f;
         }
 
@@ -456,6 +544,7 @@ namespace PhewaValley
 
         public void Recover(Vector3 near)
         {
+            simulationTime = 0;
             float x = Mathf.Clamp(Mathf.Round(near.x / 80) * 80 + 3.1f, -476, 403), z = Mathf.Clamp(near.z + 8, -460, 540);
             body.enabled = false; transform.SetPositionAndRotation(new Vector3(x, World.TerrainHeight(x, z) + .1f, z), Quaternion.identity); body.enabled = true;
             speed = vertical = Slip = steerAngle = gearDip = lastForward = 0; Gear = 1; Braking = false; velocity = Vector3.zero; yawRate = 0; pitch = roll = pitchVel = rollVel = 0; snapVisual = true;
@@ -530,7 +619,7 @@ namespace PhewaValley
             {
                 var car = G.car; speed = Mathf.Abs(car.speed);
                 lookIdle = Mathf.Abs(mx) + Mathf.Abs(my) > .02f ? 0 : lookIdle + dt;
-                if (lookIdle > 1.2f && speed > 2) { yaw = Mathf.LerpAngle(yaw, car.transform.eulerAngles.y + (car.speed < -1 ? 180 : 0), dt * 2.2f); pitch = Mathf.Lerp(pitch, 10, dt); }
+                if (!photo && lookIdle > 1.2f && speed > 2) { yaw = Mathf.LerpAngle(yaw, car.transform.eulerAngles.y + (car.speed < -1 ? 180 : 0), dt * 2.2f); pitch = Mathf.Lerp(pitch, 10, dt); }
             }
             else if (G && G.player) speed = G.player.Speed;
             // Faster means wider: sprinting and driving open the field of view a little.

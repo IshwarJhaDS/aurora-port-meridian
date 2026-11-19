@@ -8,24 +8,26 @@ namespace PhewaValley
 {
     public class DayNight : MonoBehaviour
     {
-        public Light sun, moon, fill; Material sky; readonly List<Light> lampLights = new List<Light>();
+        public Light sun, moon, fill; Light bounce; Material sky; readonly List<Light> lampLights = new List<Light>();
         // Keep save-facing fields for compatibility; rain effects are disabled.
         public float rainTarget, rainTimer;
         public float Wetness => 0; public float Rain => 0;
         public float Night { get; private set; }
         public bool PowerCut { get; private set; } public string PowerCutUntil { get; private set; }
-        public string WeatherName => PowerCut ? "Load shedding · बत्ती गयो" : Night > .5f ? "Cool, clear night" : "Hot and hazy";
+        public string WeatherName => PowerCut ? "Load shedding · बत्ती गयो" : Night > .5f ? "Cool, clear night" : "Clear daylight";
         static readonly int NightId = Shader.PropertyToID("_PhewaNight"), PowerId = Shader.PropertyToID("_PhewaPower"), WetId = Shader.PropertyToID("_PhewaWet");
 
         public void Init()
         {
             var sunGo = new GameObject("Sun"); sunGo.transform.SetParent(transform, false);
-            sun = sunGo.AddComponent<Light>(); sun.type = LightType.Directional; sun.shadows = LightShadows.Soft; sun.shadowStrength = .85f;
+            sun = sunGo.AddComponent<Light>(); sun.type = LightType.Directional; sun.shadows = LightShadows.Soft; sun.shadowStrength = .8f; sun.shadowBias = .03f; sun.shadowNormalBias = .25f;
             var moonGo = new GameObject("Moon"); moonGo.transform.SetParent(transform, false);
-            moon = moonGo.AddComponent<Light>(); moon.type = LightType.Directional; moon.shadows = LightShadows.Soft; moon.shadowStrength = .5f; moon.color = new Color(.55f, .66f, 1f);
+            moon = moonGo.AddComponent<Light>(); moon.type = LightType.Directional; moon.shadows = LightShadows.Soft; moon.shadowStrength = .3f; moon.color = new Color(.55f, .66f, 1f);
+            bounce = new GameObject("Soft environment fill").AddComponent<Light>(); bounce.transform.SetParent(transform, false);
+            bounce.type = LightType.Directional; bounce.shadows = LightShadows.None;
             RenderSettings.sun = sun;
             var skyShader = Shader.Find("Skybox/Procedural");
-            if (skyShader) { sky = new Material(skyShader); sky.SetFloat("_AtmosphereThickness", 1.25f); sky.SetFloat("_SunSize", .05f); RenderSettings.skybox = sky; }
+            if (skyShader) { sky = new Material(skyShader); sky.SetFloat("_AtmosphereThickness", 1f); sky.SetFloat("_SunSize", .05f); RenderSettings.skybox = sky; }
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
             RenderSettings.fog = true; RenderSettings.fogMode = FogMode.ExponentialSquared;
             QualitySettings.shadowDistance = 140;
@@ -68,24 +70,33 @@ namespace PhewaValley
             float day01 = 1 - Night, cloud = Rain * .6f, noon = Mathf.Clamp01(elevation * 1.6f);
             // Hot, golden, slightly hazy days.
             sun.intensity = Mathf.Lerp(0, 1.35f, day01) * (1 - cloud * .6f);
-            sun.color = Color.Lerp(new Color(1, .55f, .3f), new Color(1, .9f, .74f), noon);
+            sun.color = Color.Lerp(new Color(1, .78f, .58f), new Color(1, .98f, .94f), noon);
             sun.enabled = sun.intensity > .01f;
             // Moonlit, cool nights.
-            moon.intensity = .22f * Night * (1 - cloud * .6f); moon.enabled = moon.intensity > .01f;
+            moon.intensity = .65f * Night * (1 - cloud * .6f); moon.enabled = moon.intensity > .01f;
             var camT = Camera.main ? Camera.main.transform : null;
-            fill.enabled = Night > .05f && camT;
+            bounce.intensity = Mathf.Lerp(.18f, .38f, Night);
+            bounce.color = Color.Lerp(new Color(1f, .94f, .84f), new Color(.7f, .8f, 1f), Night);
+            bounce.transform.rotation = camT ? Quaternion.Euler(30, camT.eulerAngles.y, 0) : Quaternion.Euler(30, 0, 0);
+            fill.enabled = camT;
             if (fill.enabled)
             {
                 var toCam = camT.position - focus; toCam.y = 0; toCam = toCam.sqrMagnitude > .01f ? toCam.normalized : Vector3.back;
-                fill.transform.position = focus + Vector3.up * 2.4f + toCam * 2.2f; fill.intensity = .9f * Night;
+                fill.transform.position = focus + Vector3.up * 1.9f + toCam * 1.5f; fill.intensity = Mathf.Lerp(.85f, 1.25f, Night);
+                fill.color = Color.Lerp(new Color(.95f, .97f, 1f), new Color(.78f, .86f, 1f), Night);
             }
-            if (sky) { sky.SetFloat("_Exposure", Mathf.Lerp(.35f, 1.3f, day01) * (1 - cloud * .45f)); sky.SetColor("_SkyTint", Color.Lerp(Color.Lerp(new Color(.35f, .42f, .7f), new Color(.62f, .55f, .45f), day01), new Color(.6f, .62f, .66f), cloud)); sky.SetColor("_GroundColor", Color.Lerp(new Color(.08f, .1f, .16f), new Color(.55f, .48f, .38f), day01)); }
+            if (sky) { sky.SetFloat("_Exposure", Mathf.Lerp(.65f, 1.3f, day01) * (1 - cloud * .45f)); sky.SetColor("_SkyTint", Color.Lerp(Color.Lerp(new Color(.35f, .42f, .7f), new Color(.5f, .56f, .65f), day01), new Color(.6f, .62f, .66f), cloud)); sky.SetColor("_GroundColor", Color.Lerp(new Color(.08f, .1f, .16f), new Color(.38f, .4f, .43f), day01)); }
             // Night ambient is a readable blue moonlight: faces and clothes stay visible, not pure silhouettes.
-            RenderSettings.ambientSkyColor = Color.Lerp(new Color(.1f, .14f, .24f), new Color(.62f, .6f, .58f), day01) * (1 - cloud * .3f);
-            RenderSettings.ambientEquatorColor = Color.Lerp(new Color(.09f, .12f, .2f), new Color(.62f, .52f, .38f), day01);
-            RenderSettings.ambientGroundColor = Color.Lerp(new Color(.05f, .06f, .09f), new Color(.32f, .26f, .18f), day01);
-            RenderSettings.fogColor = Color.Lerp(new Color(.07f, .1f, .2f), Color.Lerp(new Color(.86f, .78f, .62f), new Color(.72f, .76f, .8f), cloud), day01);
-            RenderSettings.fogDensity = (day01 > .5f ? .0026f : .0016f) + Rain * .004f;
+            RenderSettings.ambientSkyColor = Color.Lerp(new Color(.3f, .36f, .46f), new Color(.56f, .65f, .78f), day01) * (1 - cloud * .3f);
+            RenderSettings.ambientEquatorColor = Color.Lerp(new Color(.26f, .31f, .4f), new Color(.45f, .49f, .55f), day01);
+            RenderSettings.ambientGroundColor = Color.Lerp(new Color(.15f, .18f, .24f), new Color(.24f, .25f, .28f), day01);
+            // Runtime glTF renderers need an up-to-date ambient probe as the sky changes.
+            var ambient = new UnityEngine.Rendering.SphericalHarmonicsL2();
+            ambient.AddAmbientLight(Color.Lerp(new Color(.16f, .2f, .27f), new Color(.32f, .35f, .39f), day01));
+            ambient.AddDirectionalLight(Vector3.up, RenderSettings.ambientSkyColor, .5f);
+            RenderSettings.ambientProbe = ambient;
+            RenderSettings.fogColor = Color.Lerp(new Color(.12f, .17f, .24f), Color.Lerp(new Color(.69f, .77f, .85f), new Color(.72f, .76f, .8f), cloud), day01);
+            RenderSettings.fogDensity = (day01 > .5f ? .0015f : .0013f) + Rain * .004f;
             Shader.SetGlobalFloat(NightId, Night); Shader.SetGlobalFloat(PowerId, PowerCut ? 0 : 1);
             Shader.SetGlobalFloat(WetId, 0);
             var near = PowerCut ? new List<LampInfo>() : lamps.Where(l => !damaged.Contains(l.id)).OrderBy(l => (l.position - focus).sqrMagnitude).Take(lampLights.Count).ToList();

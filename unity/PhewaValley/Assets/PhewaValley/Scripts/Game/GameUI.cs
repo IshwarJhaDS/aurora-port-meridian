@@ -16,8 +16,9 @@ namespace PhewaValley
         string say = ""; Vector2 journalScroll, mapScroll; string selectedPlace;
 
         Game G => Game.Instance;
+        public bool PhotoActive => photo;
         public bool PanelOpen => panel != Panel.None || wheel;
-        public bool BlocksCamera => PanelOpen || ShowWork || wheel || G != null && (G.InDialogue || G.activities?.Current is CyberCafe || G.heroes != null && G.heroes.Switching) || !(G?.Started ?? false);
+        public bool BlocksCamera => G && G.dhaneActions && G.dhaneActions.Open || PanelOpen || ShowWork || G != null && (G.InDialogue || G.activities?.Current is CyberCafe || G.heroes != null && G.heroes.Switching) || !(G?.Started ?? false);
 
         static readonly Dictionary<string, string> DevaDistrict = new Dictionary<string, string> { ["downtown"] = "दरबार टोल", ["coast"] = "फेवा ताल किनार", ["rural"] = "सराङकोट डाँडा", ["industrial"] = "घाट बजार", ["suburbs"] = "नेवा टोल", ["highway"] = "पृथ्वी राजमार्ग" };
 
@@ -30,6 +31,7 @@ namespace PhewaValley
             toasts.RemoveAll(t => Time.unscaledTime - t.born > 6);
             if (G == null || !G.Ready) return;
             if (!G.Started) { if (Input.GetKeyDown(KeyCode.Return)) G.Begin(); return; }
+            if (G.heroes.Switching || G.dhaneActions && G.dhaneActions.Open) return;
             if (Input.GetKeyDown(KeyCode.Escape))
             {
                 if (wheel) wheel = false;
@@ -39,17 +41,32 @@ namespace PhewaValley
                 confirmReset = false; return;
             }
             if (G.InDialogue) { if (GUIUtility.keyboardControl == 0) for (int i = 0; i < 6; i++) if (Input.GetKeyDown(KeyCode.Alpha1 + i)) { var o = G.dialogue.Current.options.ElementAtOrDefault(i); if (o != null) G.dialogue.Choose(o.id); } return; }
+            if (ShowWork)
+            {
+                if (G.progress.Mission("cafe")?.status != "active") ShowWork = false;
+                return;
+            }
             if (GUIUtility.keyboardControl != 0 || G.activities.Current != null) return;
+            if (wheel)
+            {
+                if (Input.GetKeyDown(KeyCode.Tab)) wheel = false;
+                for (int i = 0; i < G.heroes.heroes.Count; i++)
+                    if (Input.GetKeyDown(KeyCode.Alpha1 + i)) { wheel = false; G.heroes.Switch(i); break; }
+                return;
+            }
+            if (photo)
+            {
+                if (Input.GetKeyDown(KeyCode.P)) { photo = false; G.rig.photo = false; }
+                else if (Input.GetKeyDown(KeyCode.Return)) Capture();
+                return;
+            }
             if (Input.GetKeyDown(KeyCode.F2)) G.progress.showFirstVisitHints = !G.progress.showFirstVisitHints;
             if (Input.GetKeyDown(KeyCode.F1)) { hudHidden = !hudHidden; if (hudHidden) Toast("HUD hidden · F1 to bring it back", false); }
             if (Input.GetKeyDown(KeyCode.M)) panel = panel == Panel.Map ? Panel.None : Panel.Map;
             if (Input.GetKeyDown(KeyCode.J)) panel = panel == Panel.Journal ? Panel.None : Panel.Journal;
             if (Input.GetKeyDown(KeyCode.P) && panel == Panel.None) { photo = !photo; G.rig.photo = photo; if (photo && World.DistanceXZ(G.player.transform.position, G.data.PoiPosition("lookout")) < 25) G.missions.Event("photo", "lookout"); }
             if (Input.GetKeyDown(KeyCode.V) && panel == Panel.None && !photo) Wipe(() => { G.rig.CycleMode(); Toast($"Camera · {G.rig.ModeName}", false); });
-            if (Input.GetKeyDown(KeyCode.Tab) && panel == Panel.None) wheel = !wheel;
-            if (wheel) for (int i = 0; i < G.heroes.heroes.Count; i++) if (Input.GetKeyDown(KeyCode.Alpha1 + i)) { wheel = false; G.heroes.Switch(i); }
-            if (photo && Input.GetKeyDown(KeyCode.Return)) Capture();
-            if (ShowWork && G.progress.Mission("cafe")?.status != "active") ShowWork = false;
+            if (Input.GetKeyDown(KeyCode.Tab) && panel == Panel.None) wheel = true;
         }
 
         void Capture()
@@ -65,6 +82,7 @@ namespace PhewaValley
             float scale = Screen.height / 1080f; GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1));
             float W = Screen.width / scale, H = 1080;
             if (G == null || !G.Started) { Welcome(W, H); return; }
+            if (G.dhaneActions && G.dhaneActions.Open) return;
             DrawWipe(W, H);
             if (photo) { Retro.Fill(new Rect(0, 0, W, 70), Color.black); Retro.Fill(new Rect(0, H - 70, W, 70), Color.black); GUI.Label(new Rect(40, H - 52, 1100, 40), "POSTCARD · move the mouse to frame, scroll to zoom · ENTER to capture · P to return", new GUIStyle(Retro.Eyebrow) { normal = { textColor = Retro.Paper } }); return; }
             if (!hudHidden) { WorldLabels(scale); Hud(W, H); FirstVisitHints(); Radar(W, H); RadioPanel(W); }
@@ -100,6 +118,8 @@ namespace PhewaValley
         // ───────────── HUD ─────────────
         void Hud(float W, float H)
         {
+            if (G.heroes.Current.id == "dhane")
+                GUI.Label(new Rect(W / 2 - 180, H - 58, 360, 24), "F4  Dhane actions", new GUIStyle(Retro.Small) { alignment = TextAnchor.MiddleCenter });
             var p = G.player.transform.position; var d = World.DistrictAt(p.x, p.z);
             // Location tag: paper with dhaka band, English and Devanagari names.
             var tag = new Rect(18, 18, 400, 112); Retro.PaperPanel(tag, false); Retro.Dhaka(new Rect(tag.x + 3, tag.y + 3, tag.width - 6, 10));
